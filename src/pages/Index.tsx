@@ -4,8 +4,16 @@ import { NewsCard } from "@/components/NewsCard";
 import { FilterBar } from "@/components/FilterBar";
 import { ThreadSection } from "@/components/ThreadSection";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Newspaper, Sparkles } from "lucide-react";
+import { Newspaper, Sparkles, LogOut, User as UserIcon } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface News {
   id: string;
@@ -23,6 +31,7 @@ const Index = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedNews, setSelectedNews] = useState<{ id: string; title: string } | null>(null);
   const [user, setUser] = useState<any>(null);
+  const [profile, setProfile] = useState<{ username: string; avatar_url: string | null } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -33,6 +42,18 @@ const Index = () => {
   const checkUser = async () => {
     const { data } = await supabase.auth.getUser();
     setUser(data.user);
+    
+    if (data.user) {
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("username, avatar_url")
+        .eq("id", data.user.id)
+        .single();
+      
+      if (profileData) {
+        setProfile(profileData);
+      }
+    }
   };
 
   const fetchNews = async () => {
@@ -56,7 +77,7 @@ const Index = () => {
     setIsLoading(false);
   };
 
-  const handleFilterChange = (filters: { category: string; location: string; search: string }) => {
+  const handleFilterChange = (filters: { category: string; location: string; search: string; timeFilter: string }) => {
     let filtered = [...news];
 
     if (filters.category !== "Toutes") {
@@ -75,11 +96,39 @@ const Index = () => {
       );
     }
 
+    if (filters.timeFilter !== "all") {
+      const now = new Date();
+      filtered = filtered.filter((n) => {
+        const publishedDate = new Date(n.published_at);
+        const diffTime = now.getTime() - publishedDate.getTime();
+        const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+        if (filters.timeFilter === "today") {
+          return diffDays < 1;
+        } else if (filters.timeFilter === "week") {
+          return diffDays < 7;
+        } else if (filters.timeFilter === "month") {
+          return diffDays < 30;
+        }
+        return true;
+      });
+    }
+
     setFilteredNews(filtered);
   };
 
   const handleAuth = async () => {
     window.location.href = "/auth";
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    toast({
+      title: "Déconnexion",
+      description: "À bientôt sur HERMÈS",
+    });
   };
 
   return (
@@ -98,10 +147,34 @@ const Index = () => {
               </div>
             </div>
 
-            {!user && (
+            {!user ? (
               <Button onClick={handleAuth} className="bg-primary hover:bg-primary/90">
                 Connexion
               </Button>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={profile?.avatar_url || undefined} />
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {profile?.username?.[0]?.toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => window.location.href = `/profile/${profile?.username}`}>
+                    <UserIcon className="mr-2 h-4 w-4" />
+                    Mon profil
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Déconnexion
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
           </div>
         </div>

@@ -5,11 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Mail, Lock } from "lucide-react";
+import { Sparkles, Mail, Lock, User } from "lucide-react";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const navigate = useNavigate();
@@ -32,11 +33,24 @@ const Auth = () => {
 
     try {
       if (isSignUp) {
+        if (!username || username.length < 3) {
+          toast({
+            title: "Erreur",
+            description: "Le pseudo doit contenir au moins 3 caractères",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+
         const { error } = await supabase.auth.signUp({
           email,
           password,
           options: {
             emailRedirectTo: `${window.location.origin}/`,
+            data: {
+              username: username,
+            },
           },
         });
 
@@ -85,6 +99,26 @@ const Auth = () => {
 
         {/* Form */}
         <form onSubmit={handleAuth} className="space-y-4">
+          {isSignUp && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Pseudo</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="votre_pseudo"
+                  className="pl-10 bg-background border-border"
+                  required={isSignUp}
+                  minLength={3}
+                  maxLength={30}
+                  pattern="[a-zA-Z0-9_]+"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Email</label>
             <div className="relative">

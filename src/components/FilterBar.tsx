@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Filter, X } from "lucide-react";
+import { Search, Filter, X, Calendar } from "lucide-react";
 import { useState } from "react";
 
 interface FilterBarProps {
@@ -9,6 +9,7 @@ interface FilterBarProps {
     category: string;
     location: string;
     search: string;
+    timeFilter: string;
   }) => void;
 }
 
@@ -19,18 +20,21 @@ export const FilterBar = ({ onFilterChange }: FilterBarProps) => {
   const [category, setCategory] = useState("Toutes");
   const [location, setLocation] = useState("Toutes");
   const [search, setSearch] = useState("");
+  const [timeFilter, setTimeFilter] = useState("all");
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const handleFilterChange = (newFilters: Partial<{ category: string; location: string; search: string }>) => {
+  const handleFilterChange = (newFilters: Partial<{ category: string; location: string; search: string; timeFilter: string }>) => {
     const updatedFilters = {
       category: newFilters.category ?? category,
       location: newFilters.location ?? location,
       search: newFilters.search ?? search,
+      timeFilter: newFilters.timeFilter ?? timeFilter,
     };
 
     if (newFilters.category !== undefined) setCategory(newFilters.category);
     if (newFilters.location !== undefined) setLocation(newFilters.location);
     if (newFilters.search !== undefined) setSearch(newFilters.search);
+    if (newFilters.timeFilter !== undefined) setTimeFilter(newFilters.timeFilter);
 
     onFilterChange(updatedFilters);
   };
@@ -39,10 +43,11 @@ export const FilterBar = ({ onFilterChange }: FilterBarProps) => {
     setCategory("Toutes");
     setLocation("Toutes");
     setSearch("");
-    onFilterChange({ category: "Toutes", location: "Toutes", search: "" });
+    setTimeFilter("all");
+    onFilterChange({ category: "Toutes", location: "Toutes", search: "", timeFilter: "all" });
   };
 
-  const hasActiveFilters = category !== "Toutes" || location !== "Toutes" || search !== "";
+  const hasActiveFilters = category !== "Toutes" || location !== "Toutes" || search !== "" || timeFilter !== "all";
 
   return (
     <div className="space-y-4 mb-8">
@@ -84,7 +89,7 @@ export const FilterBar = ({ onFilterChange }: FilterBarProps) => {
 
       {/* Expanded Filters */}
       {isExpanded && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-card/50 rounded-lg border border-border animate-fade-in">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-card/50 rounded-lg border border-border animate-fade-in">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Catégorie</label>
             <Select value={category} onValueChange={(value) => handleFilterChange({ category: value })}>
@@ -113,6 +118,24 @@ export const FilterBar = ({ onFilterChange }: FilterBarProps) => {
                     {loc}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground flex items-center gap-2">
+              <Calendar className="w-4 h-4" />
+              Période
+            </label>
+            <Select value={timeFilter} onValueChange={(value) => handleFilterChange({ timeFilter: value })}>
+              <SelectTrigger className="bg-card border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toute période</SelectItem>
+                <SelectItem value="today">Aujourd'hui</SelectItem>
+                <SelectItem value="week">Cette semaine</SelectItem>
+                <SelectItem value="month">Ce mois-ci</SelectItem>
               </SelectContent>
             </Select>
           </div>

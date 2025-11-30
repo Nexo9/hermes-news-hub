@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
@@ -15,6 +15,10 @@ interface Thread {
   content: string;
   created_at: string;
   user_id: string;
+  profiles: {
+    username: string;
+    avatar_url: string | null;
+  } | null;
 }
 
 interface ThreadSectionProps {
@@ -44,13 +48,14 @@ export const ThreadSection = ({ newsId, newsTitle, isOpen, onClose }: ThreadSect
   const fetchThreads = async () => {
     if (!newsId) return;
 
-    const { data, error } = await supabase
+    // Fetch threads with profiles
+    const { data: threadsData, error: threadsError } = await supabase
       .from("threads")
       .select("*")
       .eq("news_id", newsId)
       .order("created_at", { ascending: false });
 
-    if (error) {
+    if (threadsError) {
       toast({
         title: "Erreur",
         description: "Impossible de charger les discussions",
@@ -59,7 +64,27 @@ export const ThreadSection = ({ newsId, newsTitle, isOpen, onClose }: ThreadSect
       return;
     }
 
-    setThreads(data || []);
+    // Fetch profiles for all user_ids
+    if (threadsData && threadsData.length > 0) {
+      const userIds = [...new Set(threadsData.map(t => t.user_id))];
+      const { data: profilesData, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id, username, avatar_url")
+        .in("id", userIds);
+
+      if (!profilesError && profilesData) {
+        const profilesMap = new Map(profilesData.map(p => [p.id, p]));
+        const threadsWithProfiles = threadsData.map(thread => ({
+          ...thread,
+          profiles: profilesMap.get(thread.user_id) || null,
+        }));
+        setThreads(threadsWithProfiles);
+      } else {
+        setThreads(threadsData.map(t => ({ ...t, profiles: null })));
+      }
+    } else {
+      setThreads([]);
+    }
   };
 
   const handleSubmit = async () => {
@@ -142,13 +167,14 @@ export const ThreadSection = ({ newsId, newsTitle, isOpen, onClose }: ThreadSect
                   >
                     <div className="flex gap-3">
                       <Avatar className="w-10 h-10 bg-primary/20">
+                        <AvatarImage src={thread.profiles?.avatar_url || undefined} />
                         <AvatarFallback className="text-primary">
-                          {thread.user_id.slice(0, 2).toUpperCase()}
+                          {thread.profiles?.username?.[0]?.toUpperCase() || 'U'}
                         </AvatarFallback>
                       </Avatar>
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <span className="font-medium text-foreground">Utilisateur</span>
+                          <span className="font-medium text-foreground">@{thread.profiles?.username || 'Utilisateur'}</span>
                           <span>•</span>
                           <span>
                             {formatDistanceToNow(new Date(thread.created_at), {
