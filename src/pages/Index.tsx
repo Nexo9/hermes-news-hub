@@ -7,7 +7,7 @@ import { ThreadSection } from "@/components/ThreadSection";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle } from "lucide-react";
+import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +34,7 @@ const Index = () => {
   const [selectedNews, setSelectedNews] = useState<{ id: string; title: string } | null>(null);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<{ username: string; avatar_url: string | null } | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -55,6 +56,16 @@ const Index = () => {
       if (profileData) {
         setProfile(profileData);
       }
+
+      // Check admin status
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", data.user.id)
+        .eq("role", "admin")
+        .single();
+
+      setIsAdmin(!!roles);
     }
   };
 
@@ -170,10 +181,23 @@ const Index = () => {
                     <UserIcon className="mr-2 h-4 w-4" />
                     Mon profil
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/search')}>
+                    <SearchIcon className="mr-2 h-4 w-4" />
+                    Rechercher
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => navigate('/messages')}>
                     <MessageCircle className="mr-2 h-4 w-4" />
                     Messages
                   </DropdownMenuItem>
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={() => navigate('/admin')}>
+                        <Shield className="mr-2 h-4 w-4" />
+                        Administration
+                      </DropdownMenuItem>
+                    </>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
