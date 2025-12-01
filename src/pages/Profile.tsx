@@ -4,9 +4,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Pencil, ArrowLeft } from "lucide-react";
+import { Pencil, ArrowLeft, MessageSquare } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
+import { FollowButton } from "@/components/FollowButton";
 
 interface Profile {
   id: string;
@@ -33,6 +34,8 @@ const Profile = () => {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [followersCount, setFollowersCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -60,6 +63,20 @@ const Profile = () => {
       }
 
       setProfile(profileData);
+
+      // Fetch followers/following counts
+      const { count: followersCount } = await supabase
+        .from('subscriptions')
+        .select('*', { count: 'exact', head: true })
+        .eq('following_id', profileData.id);
+
+      const { count: followingCount } = await supabase
+        .from('subscriptions')
+        .select('*', { count: 'exact', head: true })
+        .eq('follower_id', profileData.id);
+
+      setFollowersCount(followersCount || 0);
+      setFollowingCount(followingCount || 0);
 
       const { data: threadsData, error: threadsError } = await supabase
         .from('threads')
@@ -98,6 +115,47 @@ const Profile = () => {
 
   const isOwnProfile = currentUserId === profile.id;
 
+  const startConversation = async () => {
+    if (!currentUserId || !profile) return;
+
+    // Check if conversation exists
+    const { data: existingParticipants } = await supabase
+      .from('conversation_participants')
+      .select('conversation_id')
+      .eq('user_id', currentUserId);
+
+    if (existingParticipants) {
+      for (const p of existingParticipants) {
+        const { data: otherParticipant } = await supabase
+          .from('conversation_participants')
+          .select('user_id')
+          .eq('conversation_id', p.conversation_id)
+          .eq('user_id', profile.id)
+          .single();
+
+        if (otherParticipant) {
+          navigate('/messages');
+          return;
+        }
+      }
+    }
+
+    // Create new conversation
+    const { data: newConv } = await supabase
+      .from('conversations')
+      .insert({})
+      .select()
+      .single();
+
+    if (newConv) {
+      await supabase.from('conversation_participants').insert([
+        { conversation_id: newConv.id, user_id: currentUserId },
+        { conversation_id: newConv.id, user_id: profile.id },
+      ]);
+      navigate('/messages');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="relative">
@@ -117,17 +175,30 @@ const Profile = () => {
           <ArrowLeft className="h-5 w-5" />
         </Button>
 
-        {/* Edit button */}
-        {isOwnProfile && (
-          <Button
-            onClick={() => navigate('/profile/edit')}
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 right-4 bg-background/80 backdrop-blur-sm"
-          >
-            <Pencil className="h-5 w-5" />
-          </Button>
-        )}
+        {/* Action buttons */}
+        <div className="absolute top-4 right-4 flex gap-2">
+          {isOwnProfile ? (
+            <Button
+              onClick={() => navigate('/profile/edit')}
+              variant="ghost"
+              size="icon"
+              className="bg-background/80 backdrop-blur-sm"
+            >
+              <Pencil className="h-5 w-5" />
+            </Button>
+          ) : (
+            <>
+              <Button
+                onClick={startConversation}
+                variant="ghost"
+                size="icon"
+                className="bg-background/80 backdrop-blur-sm"
+              >
+                <MessageSquare className="h-5 w-5" />
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="max-w-4xl mx-auto px-6 -mt-20">
@@ -142,9 +213,23 @@ const Profile = () => {
           <div className="flex-1 pb-2">
             <h1 className="text-3xl font-bold text-foreground mb-2">@{profile.username}</h1>
             {profile.bio && (
-              <p className="text-muted-foreground">{profile.bio}</p>
+              <p className="text-muted-foreground mb-3">{profile.bio}</p>
             )}
+            <div className="flex gap-4 text-sm">
+              <span className="text-muted-foreground">
+                <strong className="text-foreground">{followersCount}</strong> abonnés
+              </span>
+              <span className="text-muted-foreground">
+                <strong className="text-foreground">{followingCount}</strong> abonnements
+              </span>
+            </div>
           </div>
+          
+          {!isOwnProfile && (
+            <div className="pb-2">
+              <FollowButton profileId={profile.id} currentUserId={currentUserId} />
+            </div>
+          )}
         </div>
 
         <div className="mt-8">

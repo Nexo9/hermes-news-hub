@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import { NewsCard } from "@/components/NewsCard";
 import { FilterBar } from "@/components/FilterBar";
 import { ThreadSection } from "@/components/ThreadSection";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Newspaper, Sparkles, LogOut, User as UserIcon } from "lucide-react";
+import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,7 @@ interface News {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
   const [news, setNews] = useState<News[]>([]);
   const [filteredNews, setFilteredNews] = useState<News[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -167,6 +169,10 @@ const Index = () => {
                   <DropdownMenuItem onClick={() => window.location.href = `/profile/${profile?.username}`}>
                     <UserIcon className="mr-2 h-4 w-4" />
                     Mon profil
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/messages')}>
+                    <MessageCircle className="mr-2 h-4 w-4" />
+                    Messages
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
