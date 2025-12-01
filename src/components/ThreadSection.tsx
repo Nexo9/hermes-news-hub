@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Send, MessageSquare } from "lucide-react";
+import { ThreadReplies } from "./ThreadReplies";
 
 interface Thread {
   id: string;
@@ -184,6 +185,9 @@ export const ThreadSection = ({ newsId, newsTitle, isOpen, onClose }: ThreadSect
                           </span>
                         </div>
                         <p className="text-foreground leading-relaxed whitespace-pre-wrap">{thread.content}</p>
+                        
+                        {/* Thread Replies */}
+                        <ThreadReplies threadId={thread.id} currentUserId={user?.id || null} />
                       </div>
                     </div>
                   </div>
