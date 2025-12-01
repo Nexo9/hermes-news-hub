@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Search, Send, Mic, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Search, Send, Mic, Image as ImageIcon, StopCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -45,6 +45,9 @@ const Messages = () => {
   const [searchUsername, setSearchUsername] = useState("");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRecording, setIsRecording] = useState(false);
+  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     checkUser();
@@ -243,6 +246,119 @@ const Messages = () => {
     setNewMessage("");
   };
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedConversation || !currentUserId) return;
+
+    const fileExt = file.name.split(".").pop();
+    const filePath = `${currentUserId}/${Date.now()}.${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("message-media")
+      .upload(filePath, file);
+
+    if (uploadError) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de télécharger le fichier.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { data } = supabase.storage
+      .from("message-media")
+      .getPublicUrl(filePath);
+
+    const messageType = file.type.startsWith("image/") ? "image" : "file";
+
+    const { error } = await supabase.from("messages").insert({
+      conversation_id: selectedConversation,
+      sender_id: currentUserId,
+      media_url: filePath,
+      message_type: messageType,
+    });
+
+    if (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'envoyer le fichier.",
+        variant: "destructive",
+      });
+    }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks: Blob[] = [];
+
+      recorder.ondataavailable = (e) => chunks.push(e.data);
+      recorder.onstop = async () => {
+        const blob = new Blob(chunks, { type: "audio/webm" });
+        await uploadVoiceMessage(blob);
+        stream.getTracks().forEach((track) => track.stop());
+      };
+
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsRecording(true);
+    } catch (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'accéder au microphone.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder) {
+      mediaRecorder.stop();
+      setIsRecording(false);
+      setMediaRecorder(null);
+    }
+  };
+
+  const uploadVoiceMessage = async (blob: Blob) => {
+    if (!selectedConversation || !currentUserId) return;
+
+    const filePath = `${currentUserId}/${Date.now()}.webm`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("message-media")
+      .upload(filePath, blob);
+
+    if (uploadError) {
+      toast({
+        title: "Erreur",
+        description: "Impossible de télécharger le message vocal.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { error } = await supabase.from("messages").insert({
+      conversation_id: selectedConversation,
+      sender_id: currentUserId,
+      media_url: filePath,
+      message_type: "voice",
+    });
+
+    if (error) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'envoyer le message vocal.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -350,6 +466,13 @@ const Messages = () => {
 
               <div className="p-4 border-t border-border">
                 <div className="flex gap-2 items-end">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    accept="image/*"
+                    className="hidden"
+                  />
                   <Textarea
                     placeholder="Votre message..."
                     value={newMessage}
@@ -364,11 +487,16 @@ const Messages = () => {
                     rows={2}
                   />
                   <div className="flex gap-2">
-                    <Button variant="outline" size="icon">
+                    <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()}>
                       <ImageIcon className="h-4 w-4" />
                     </Button>
-                    <Button variant="outline" size="icon">
-                      <Mic className="h-4 w-4" />
+                    <Button 
+                      variant="outline" 
+                      size="icon"
+                      onClick={isRecording ? stopRecording : startRecording}
+                      className={isRecording ? "bg-destructive text-destructive-foreground" : ""}
+                    >
+                      {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
                     </Button>
                     <Button onClick={sendMessage} size="icon">
                       <Send className="h-4 w-4" />
