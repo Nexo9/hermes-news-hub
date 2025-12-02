@@ -448,10 +448,18 @@ const Messages = () => {
                     >
                       {msg.message_type === 'text' && <p>{msg.content}</p>}
                       {msg.message_type === 'image' && msg.media_url && (
-                        <img src={msg.media_url} alt="Image" className="rounded max-w-sm" />
+                        <img 
+                          src={supabase.storage.from("message-media").getPublicUrl(msg.media_url).data.publicUrl} 
+                          alt="Image" 
+                          className="rounded max-w-sm" 
+                        />
                       )}
                       {msg.message_type === 'voice' && msg.media_url && (
-                        <audio src={msg.media_url} controls className="max-w-sm" />
+                        <audio 
+                          src={supabase.storage.from("message-media").getPublicUrl(msg.media_url).data.publicUrl} 
+                          controls 
+                          className="max-w-sm" 
+                        />
                       )}
                       <p className="text-xs opacity-70 mt-1">
                         {formatDistanceToNow(new Date(msg.created_at), {

@@ -4,10 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { NewsCard } from "@/components/NewsCard";
 import { FilterBar } from "@/components/FilterBar";
 import { ThreadSection } from "@/components/ThreadSection";
+import { FriendsList } from "@/components/FriendsList";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield } from "lucide-react";
+import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Heart } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -189,6 +190,10 @@ const Index = () => {
                     <MessageCircle className="mr-2 h-4 w-4" />
                     Messages
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/favorites')}>
+                    <Bookmark className="mr-2 h-4 w-4" />
+                    Mes Collections
+                  </DropdownMenuItem>
                   {isAdmin && (
                     <>
                       <DropdownMenuSeparator />
@@ -212,37 +217,56 @@ const Index = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        {/* Filters */}
-        <FilterBar onFilterChange={handleFilterChange} />
+        <div className="flex gap-8">
+          {/* News Feed */}
+          <div className="flex-1">
+            {/* Filters */}
+            <FilterBar onFilterChange={handleFilterChange} />
 
-        {/* News Feed */}
-        {isLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent" />
+            {isLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary border-t-transparent" />
+              </div>
+            ) : filteredNews.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+                <Newspaper className="w-16 h-16 mb-4 opacity-50" />
+                <p className="text-lg">Aucune actualité trouvée</p>
+                <p className="text-sm">Essayez de modifier vos filtres</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredNews.map((item, index) => (
+                  <div 
+                    key={item.id} 
+                    className="animate-fade-in"
+                    style={{ animationDelay: `${index * 0.1}s` }}
+                  >
+                    <NewsCard
+                      id={item.id}
+                      title={item.title}
+                      summary={item.summary}
+                      category={item.category}
+                      location={item.location}
+                      publishedAt={item.published_at}
+                      sourceUrls={item.source_urls}
+                      userId={user?.id}
+                      onViewThreads={(id) => setSelectedNews({ id, title: item.title })}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        ) : filteredNews.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
-            <Newspaper className="w-16 h-16 mb-4 opacity-50" />
-            <p className="text-lg">Aucune actualité trouvée</p>
-            <p className="text-sm">Essayez de modifier vos filtres</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredNews.map((item) => (
-              <NewsCard
-                key={item.id}
-                id={item.id}
-                title={item.title}
-                summary={item.summary}
-                category={item.category}
-                location={item.location}
-                publishedAt={item.published_at}
-                sourceUrls={item.source_urls}
-                onViewThreads={(id) => setSelectedNews({ id, title: item.title })}
-              />
-            ))}
-          </div>
-        )}
+
+          {/* Sidebar - Friends List (only when logged in) */}
+          {user && (
+            <aside className="hidden xl:block w-80 shrink-0">
+              <div className="sticky top-24">
+                <FriendsList userId={user.id} />
+              </div>
+            </aside>
+          )}
+        </div>
       </main>
 
       {/* Thread Dialog */}
