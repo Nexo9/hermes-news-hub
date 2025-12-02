@@ -10,6 +10,7 @@ import EditProfile from "./pages/EditProfile";
 import Messages from "./pages/Messages";
 import Search from "./pages/Search";
 import AdminDashboard from "./pages/AdminDashboard";
+import Favorites from "./pages/Favorites";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/messages" element={<Messages />} />
           <Route path="/search" element={<Search />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/favorites" element={<Favorites />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
