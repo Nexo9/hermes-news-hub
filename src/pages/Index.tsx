@@ -1,14 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { NewsCard } from "@/components/NewsCard";
 import { FilterBar } from "@/components/FilterBar";
 import { ThreadSection } from "@/components/ThreadSection";
 import { FriendsList } from "@/components/FriendsList";
+import { GroupsList } from "@/components/GroupsList";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Heart } from "lucide-react";
+import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,15 +33,22 @@ const Index = () => {
   const [news, setNews] = useState<News[]>([]);
   const [filteredNews, setFilteredNews] = useState<News[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
   const [selectedNews, setSelectedNews] = useState<{ id: string; title: string } | null>(null);
   const [user, setUser] = useState<any>(null);
   const [profile, setProfile] = useState<{ username: string; avatar_url: string | null } | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [filters, setFilters] = useState({ category: "Toutes", location: "Toutes", search: "", timeFilter: "all" });
   const { toast } = useToast();
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     checkUser();
-    fetchNews();
+    fetchNews(0, true);
   }, []);
 
   const checkUser = async () => {
@@ -70,13 +78,21 @@ const Index = () => {
     }
   };
 
-  const fetchNews = async () => {
-    setIsLoading(true);
+  const fetchNews = useCallback(async (pageNum: number, isInitial: boolean = false) => {
+    if (isInitial) {
+      setIsLoading(true);
+    } else {
+      setIsLoadingMore(true);
+    }
+
+    const from = pageNum * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
     const { data, error } = await supabase
       .from("news")
       .select("*")
       .order("published_at", { ascending: false })
-      .limit(20);
+      .range(from, to);
 
     if (error) {
       toast({
@@ -85,13 +101,52 @@ const Index = () => {
         variant: "destructive",
       });
     } else {
-      setNews(data || []);
-      setFilteredNews(data || []);
+      const newData = data || [];
+      if (isInitial) {
+        setNews(newData);
+      } else {
+        setNews((prev) => [...prev, ...newData]);
+      }
+      setHasMore(newData.length === PAGE_SIZE);
     }
-    setIsLoading(false);
-  };
 
-  const handleFilterChange = (filters: { category: string; location: string; search: string; timeFilter: string }) => {
+    if (isInitial) {
+      setIsLoading(false);
+    } else {
+      setIsLoadingMore(false);
+    }
+  }, [toast]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (observerRef.current) observerRef.current.disconnect();
+
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore && !isLoading) {
+          const nextPage = page + 1;
+          setPage(nextPage);
+          fetchNews(nextPage);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observerRef.current.observe(loadMoreRef.current);
+    }
+
+    return () => {
+      if (observerRef.current) observerRef.current.disconnect();
+    };
+  }, [hasMore, isLoadingMore, isLoading, page, fetchNews]);
+
+  // Apply filters to news
+  useEffect(() => {
+    applyFilters();
+  }, [news, filters]);
+
+  const applyFilters = () => {
     let filtered = [...news];
 
     if (filters.category !== "Toutes") {
@@ -129,6 +184,10 @@ const Index = () => {
     }
 
     setFilteredNews(filtered);
+  };
+
+  const handleFilterChange = (newFilters: { category: string; location: string; search: string; timeFilter: string }) => {
+    setFilters(newFilters);
   };
 
   const handleAuth = async () => {
@@ -234,35 +293,53 @@ const Index = () => {
                 <p className="text-sm">Essayez de modifier vos filtres</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredNews.map((item, index) => (
-                  <div 
-                    key={item.id} 
-                    className="animate-fade-in"
-                    style={{ animationDelay: `${index * 0.1}s` }}
-                  >
-                    <NewsCard
-                      id={item.id}
-                      title={item.title}
-                      summary={item.summary}
-                      category={item.category}
-                      location={item.location}
-                      publishedAt={item.published_at}
-                      sourceUrls={item.source_urls}
-                      userId={user?.id}
-                      onViewThreads={(id) => setSelectedNews({ id, title: item.title })}
-                    />
-                  </div>
-                ))}
-              </div>
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredNews.map((item, index) => (
+                    <div 
+                      key={item.id} 
+                      className="animate-fade-in"
+                      style={{ animationDelay: `${Math.min(index, 10) * 0.05}s` }}
+                    >
+                      <NewsCard
+                        id={item.id}
+                        title={item.title}
+                        summary={item.summary}
+                        category={item.category}
+                        location={item.location}
+                        publishedAt={item.published_at}
+                        sourceUrls={item.source_urls}
+                        userId={user?.id}
+                        onViewThreads={(id) => setSelectedNews({ id, title: item.title })}
+                      />
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Infinite scroll trigger */}
+                <div ref={loadMoreRef} className="flex items-center justify-center py-8">
+                  {isLoadingMore && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Chargement...</span>
+                    </div>
+                  )}
+                  {!hasMore && filteredNews.length > 0 && (
+                    <p className="text-sm text-muted-foreground">
+                      Vous avez tout vu !
+                    </p>
+                  )}
+                </div>
+              </>
             )}
           </div>
 
-          {/* Sidebar - Friends List (only when logged in) */}
+          {/* Sidebar - Friends & Groups (only when logged in) */}
           {user && (
-            <aside className="hidden xl:block w-80 shrink-0">
-              <div className="sticky top-24">
+            <aside className="hidden xl:block w-80 shrink-0 space-y-6">
+              <div className="sticky top-24 space-y-6">
                 <FriendsList userId={user.id} />
+                <GroupsList userId={user.id} />
               </div>
             </aside>
           )}
