@@ -334,9 +334,9 @@ const Index = () => {
             )}
           </div>
 
-          {/* Sidebar - Friends & Groups (only when logged in) */}
+          {/* Sidebar - Friends & Groups (only when logged in) - Desktop */}
           {user && (
-            <aside className="hidden xl:block w-80 shrink-0 space-y-6">
+            <aside className="hidden lg:block w-80 shrink-0 space-y-6">
               <div className="sticky top-24 space-y-6">
                 <FriendsList userId={user.id} />
                 <GroupsList userId={user.id} />
@@ -344,6 +344,14 @@ const Index = () => {
             </aside>
           )}
         </div>
+
+        {/* Mobile Groups Section */}
+        {user && (
+          <div className="lg:hidden mt-8 space-y-6">
+            <GroupsList userId={user.id} />
+            <FriendsList userId={user.id} />
+          </div>
+        )}
       </main>
 
       {/* Thread Dialog */}
