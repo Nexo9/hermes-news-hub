@@ -9,7 +9,7 @@ import { GroupsList } from "@/components/GroupsList";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2 } from "lucide-react";
+import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -210,14 +210,38 @@ const Index = () => {
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-white" />
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-foreground tracking-tight">HERMÈS</h1>
+                  <p className="text-xs text-muted-foreground">Information Neutre & Sociale</p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground tracking-tight">HERMÈS</h1>
-                <p className="text-xs text-muted-foreground">Information Neutre & Sociale</p>
-              </div>
+              
+              {/* Navigation Links */}
+              <nav className="hidden md:flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/map')}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Map className="h-4 w-4 mr-2" />
+                  Carte
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/terms')}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Charte
+                </Button>
+              </nav>
             </div>
 
             {!user ? (
@@ -252,6 +276,15 @@ const Index = () => {
                   <DropdownMenuItem onClick={() => navigate('/favorites')}>
                     <Bookmark className="mr-2 h-4 w-4" />
                     Mes Collections
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => navigate('/map')} className="md:hidden">
+                    <Map className="mr-2 h-4 w-4" />
+                    Carte des Actualités
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => navigate('/terms')} className="md:hidden">
+                    <FileText className="mr-2 h-4 w-4" />
+                    Charte d'Utilisation
                   </DropdownMenuItem>
                   {isAdmin && (
                     <>
