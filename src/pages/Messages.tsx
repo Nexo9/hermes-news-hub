@@ -35,6 +35,12 @@ interface Message {
   };
 }
 
+interface Friend {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+}
+
 const Messages = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -47,6 +53,8 @@ const Messages = () => {
   const [loading, setLoading] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [filteredFriends, setFilteredFriends] = useState<Friend[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -56,8 +64,20 @@ const Messages = () => {
   useEffect(() => {
     if (currentUserId) {
       fetchConversations();
+      fetchFriends();
     }
   }, [currentUserId]);
+
+  useEffect(() => {
+    if (searchUsername.trim()) {
+      const filtered = friends.filter(f => 
+        f.username.toLowerCase().includes(searchUsername.toLowerCase())
+      );
+      setFilteredFriends(filtered);
+    } else {
+      setFilteredFriends(friends);
+    }
+  }, [searchUsername, friends]);
 
   useEffect(() => {
     if (selectedConversation) {
@@ -74,6 +94,39 @@ const Messages = () => {
     }
     setCurrentUserId(user.id);
     setLoading(false);
+  };
+
+  const fetchFriends = async () => {
+    if (!currentUserId) return;
+
+    // Get mutual friends (users who follow each other)
+    const { data: following } = await supabase
+      .from("subscriptions")
+      .select("following_id")
+      .eq("follower_id", currentUserId);
+
+    const { data: followers } = await supabase
+      .from("subscriptions")
+      .select("follower_id")
+      .eq("following_id", currentUserId);
+
+    if (following && followers) {
+      const followingIds = following.map((f) => f.following_id);
+      const followerIds = followers.map((f) => f.follower_id);
+      const mutualIds = followingIds.filter((id) => followerIds.includes(id));
+
+      if (mutualIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, username, avatar_url")
+          .in("id", mutualIds);
+
+        if (profiles) {
+          setFriends(profiles);
+          setFilteredFriends(profiles);
+        }
+      }
+    }
   };
 
   const fetchConversations = async () => {
@@ -382,7 +435,7 @@ const Messages = () => {
             
             <div className="flex gap-2">
               <Input
-                placeholder="Pseudo de l'utilisateur"
+                placeholder="Rechercher un ami..."
                 value={searchUsername}
                 onChange={(e) => setSearchUsername(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && startNewConversation()}
@@ -391,6 +444,30 @@ const Messages = () => {
                 <Search className="h-4 w-4" />
               </Button>
             </div>
+
+            {/* Friends suggestions */}
+            {searchUsername && filteredFriends.length > 0 && (
+              <div className="mt-2 border border-border rounded-lg max-h-40 overflow-y-auto">
+                {filteredFriends.map((friend) => (
+                  <div
+                    key={friend.id}
+                    onClick={() => {
+                      setSearchUsername(friend.username);
+                      startNewConversation();
+                    }}
+                    className="p-2 hover:bg-accent/10 cursor-pointer flex items-center gap-2"
+                  >
+                    <Avatar className="h-6 w-6">
+                      <AvatarImage src={friend.avatar_url || undefined} />
+                      <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                        {friend.username[0].toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-sm">@{friend.username}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto">

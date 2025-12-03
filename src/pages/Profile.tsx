@@ -159,9 +159,9 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="relative">
-        {/* Banner */}
+        {/* Banner - reduced height */}
         <div 
-          className="h-64 bg-gradient-to-r from-primary/20 to-accent/20"
+          className="h-32 sm:h-40 bg-gradient-to-r from-primary/20 to-accent/20"
           style={profile.banner_url ? { backgroundImage: `url(${profile.banner_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
         />
         
@@ -201,17 +201,17 @@ const Profile = () => {
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-6 -mt-20">
-        <div className="flex items-end gap-6 mb-6">
-          <Avatar className="h-32 w-32 border-4 border-background">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 -mt-12 sm:-mt-16">
+        <div className="flex items-end gap-4 sm:gap-6 mb-6">
+          <Avatar className="h-20 w-20 sm:h-28 sm:w-28 border-4 border-background">
             <AvatarImage src={profile.avatar_url || undefined} />
-            <AvatarFallback className="text-3xl bg-primary text-primary-foreground">
+            <AvatarFallback className="text-2xl sm:text-3xl bg-primary text-primary-foreground">
               {profile.username[0].toUpperCase()}
             </AvatarFallback>
           </Avatar>
           
           <div className="flex-1 pb-2">
-            <h1 className="text-3xl font-bold text-foreground mb-2">@{profile.username}</h1>
+            <h1 className="text-xl sm:text-3xl font-bold text-foreground mb-2">@{profile.username}</h1>
             {profile.bio && (
               <p className="text-muted-foreground mb-3">{profile.bio}</p>
             )}
