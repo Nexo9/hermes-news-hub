@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Send, Check, Users } from "lucide-react";
+import { Send, Check, Users, MessageSquare } from "lucide-react";
 
 interface Friend {
   id: string;
@@ -64,25 +64,94 @@ export const ShareNewsDialog = ({ isOpen, onClose, newsId, newsTitle, userId }: 
     setFriends(profiles || []);
   };
 
+  const findOrCreateConversation = async (friendId: string): Promise<string | null> => {
+    // Check if conversation already exists
+    const { data: myParticipations } = await supabase
+      .from("conversation_participants")
+      .select("conversation_id")
+      .eq("user_id", userId);
+
+    if (myParticipations) {
+      for (const p of myParticipations) {
+        const { data: friendParticipation } = await supabase
+          .from("conversation_participants")
+          .select("conversation_id")
+          .eq("conversation_id", p.conversation_id)
+          .eq("user_id", friendId)
+          .maybeSingle();
+
+        if (friendParticipation) {
+          return p.conversation_id;
+        }
+      }
+    }
+
+    // Create new conversation
+    const { data: newConv, error: convError } = await supabase
+      .from("conversations")
+      .insert({})
+      .select()
+      .single();
+
+    if (convError || !newConv) {
+      console.error("Error creating conversation:", convError);
+      return null;
+    }
+
+    // Add participants
+    const { error: participantError } = await supabase
+      .from("conversation_participants")
+      .insert([
+        { conversation_id: newConv.id, user_id: userId },
+        { conversation_id: newConv.id, user_id: friendId },
+      ]);
+
+    if (participantError) {
+      console.error("Error adding participants:", participantError);
+      return null;
+    }
+
+    return newConv.id;
+  };
+
   const shareToFriend = async (friendId: string) => {
     if (sharedTo.has(friendId)) return;
     
     setLoading(true);
-    const { error } = await supabase.from("news_shares").insert({
+
+    // Record the share
+    const { error: shareError } = await supabase.from("news_shares").insert({
       sender_id: userId,
       receiver_id: friendId,
       news_id: newsId,
     });
 
-    setLoading(false);
-
-    if (error) {
+    if (shareError) {
       toast({ title: "Erreur", description: "Impossible de partager", variant: "destructive" });
+      setLoading(false);
       return;
     }
 
+    // Find or create conversation and send message with news link
+    const conversationId = await findOrCreateConversation(friendId);
+
+    if (conversationId) {
+      const newsMessage = `📰 Je te partage cette actualité :\n\n"${newsTitle}"\n\n🔗 Consulte-la sur HERMÈS !`;
+      
+      await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        sender_id: userId,
+        content: newsMessage,
+        message_type: "text",
+      });
+    }
+
+    setLoading(false);
     setSharedTo((prev) => new Set([...prev, friendId]));
-    toast({ title: "Partagé!", description: "L'actualité a été partagée" });
+    toast({ 
+      title: "Partagé!", 
+      description: "L'actualité a été envoyée dans la messagerie",
+    });
   };
 
   return (
@@ -96,6 +165,13 @@ export const ShareNewsDialog = ({ isOpen, onClose, newsId, newsTitle, userId }: 
         </DialogHeader>
 
         <p className="text-sm text-muted-foreground line-clamp-2 mb-4">"{newsTitle}"</p>
+
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-primary/10 mb-4">
+          <MessageSquare className="w-4 h-4 text-primary" />
+          <p className="text-xs text-muted-foreground">
+            L'actualité sera envoyée dans votre conversation privée
+          </p>
+        </div>
 
         {friends.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">

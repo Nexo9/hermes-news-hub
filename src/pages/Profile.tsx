@@ -4,10 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Pencil, ArrowLeft, MessageSquare } from "lucide-react";
+import { Pencil, ArrowLeft, MessageSquare, Flag } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { FollowButton } from "@/components/FollowButton";
+import { ReportUserDialog } from "@/components/ReportUserDialog";
 
 interface Profile {
   id: string;
@@ -36,6 +37,7 @@ const Profile = () => {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  const [showReportDialog, setShowReportDialog] = useState(false);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -159,9 +161,9 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-background">
       <div className="relative">
-        {/* Banner - reduced height */}
+        {/* Banner */}
         <div 
-          className="h-32 sm:h-40 bg-gradient-to-r from-primary/20 to-accent/20"
+          className="h-32 sm:h-48 bg-gradient-to-r from-primary/20 to-accent/20"
           style={profile.banner_url ? { backgroundImage: `url(${profile.banner_url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
         />
         
@@ -196,43 +198,61 @@ const Profile = () => {
               >
                 <MessageSquare className="h-5 w-5" />
               </Button>
+              {currentUserId && (
+                <Button
+                  onClick={() => setShowReportDialog(true)}
+                  variant="ghost"
+                  size="icon"
+                  className="bg-background/80 backdrop-blur-sm text-destructive hover:text-destructive"
+                >
+                  <Flag className="h-5 w-5" />
+                </Button>
+              )}
             </>
           )}
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 -mt-12 sm:-mt-16">
-        <div className="flex items-end gap-4 sm:gap-6 mb-6">
-          <Avatar className="h-20 w-20 sm:h-28 sm:w-28 border-4 border-background">
-            <AvatarImage src={profile.avatar_url || undefined} />
-            <AvatarFallback className="text-2xl sm:text-3xl bg-primary text-primary-foreground">
-              {profile.username[0].toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          
-          <div className="flex-1 pb-2">
-            <h1 className="text-xl sm:text-3xl font-bold text-foreground mb-2">@{profile.username}</h1>
-            {profile.bio && (
-              <p className="text-muted-foreground mb-3">{profile.bio}</p>
-            )}
-            <div className="flex gap-4 text-sm">
-              <span className="text-muted-foreground">
-                <strong className="text-foreground">{followersCount}</strong> abonnés
-              </span>
-              <span className="text-muted-foreground">
-                <strong className="text-foreground">{followingCount}</strong> abonnements
-              </span>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6">
+        {/* Profile info section - positioned over banner */}
+        <div className="relative -mt-16 sm:-mt-20 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+            {/* Avatar */}
+            <Avatar className="h-24 w-24 sm:h-32 sm:w-32 border-4 border-background shadow-lg">
+              <AvatarImage src={profile.avatar_url || undefined} />
+              <AvatarFallback className="text-2xl sm:text-4xl bg-primary text-primary-foreground">
+                {profile.username[0].toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            
+            {/* User info card - background for readability */}
+            <div className="flex-1 bg-background/95 backdrop-blur-sm rounded-lg p-4 sm:pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h1 className="text-xl sm:text-2xl font-bold text-foreground">@{profile.username}</h1>
+                  {profile.bio && (
+                    <p className="text-muted-foreground mt-1 text-sm sm:text-base">{profile.bio}</p>
+                  )}
+                  <div className="flex gap-4 text-sm mt-2">
+                    <span className="text-muted-foreground">
+                      <strong className="text-foreground">{followersCount}</strong> abonnés
+                    </span>
+                    <span className="text-muted-foreground">
+                      <strong className="text-foreground">{followingCount}</strong> abonnements
+                    </span>
+                  </div>
+                </div>
+                
+                {!isOwnProfile && (
+                  <FollowButton profileId={profile.id} currentUserId={currentUserId} />
+                )}
+              </div>
             </div>
           </div>
-          
-          {!isOwnProfile && (
-            <div className="pb-2">
-              <FollowButton profileId={profile.id} currentUserId={currentUserId} />
-            </div>
-          )}
         </div>
 
-        <div className="mt-8">
+        {/* Threads section */}
+        <div className="mt-8 pb-8">
           <h2 className="text-2xl font-bold text-foreground mb-4">
             Commentaires ({threads.length})
           </h2>
@@ -274,6 +294,17 @@ const Profile = () => {
           )}
         </div>
       </div>
+
+      {/* Report dialog */}
+      {currentUserId && profile && !isOwnProfile && (
+        <ReportUserDialog
+          isOpen={showReportDialog}
+          onClose={() => setShowReportDialog(false)}
+          reportedUserId={profile.id}
+          reportedUsername={profile.username}
+          reporterId={currentUserId}
+        />
+      )}
     </div>
   );
 };

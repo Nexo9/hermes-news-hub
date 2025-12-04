@@ -399,6 +399,36 @@ export type Database = {
           },
         ]
       }
+      system_messages: {
+        Row: {
+          content: string
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean
+          title: string
+          type: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean
+          title: string
+          type?: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean
+          title?: string
+          type?: string
+        }
+        Relationships: []
+      }
       thread_replies: {
         Row: {
           content: string
@@ -485,6 +515,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_reports: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          reason: string
+          reported_user_id: string
+          reporter_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          reason: string
+          reported_user_id: string
+          reporter_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          reason?: string
+          reported_user_id?: string
+          reporter_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       user_roles: {
         Row: {

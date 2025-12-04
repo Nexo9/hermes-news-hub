@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { supabase } from '@/integrations/supabase/client';
-import { ArrowLeft, MapPin, Calendar, Tag, ExternalLink, X } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Tag, ExternalLink, X, Globe } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,61 +25,92 @@ interface LocationGroup {
   news: NewsItem[];
 }
 
-// Mapping des villes/pays vers coordonnées
+// Extended coordinates mapping
 const locationCoordinates: Record<string, [number, number]> = {
   'France': [2.3522, 46.6034],
   'Paris': [2.3522, 48.8566],
   'Lyon': [4.8357, 45.7640],
   'Marseille': [5.3698, 43.2965],
+  'Toulouse': [1.4442, 43.6047],
+  'Nice': [7.2620, 43.7102],
+  'Bordeaux': [-0.5792, 44.8378],
   'États-Unis': [-95.7129, 37.0902],
   'USA': [-95.7129, 37.0902],
   'New York': [-74.0060, 40.7128],
   'Los Angeles': [-118.2437, 34.0522],
   'Washington': [-77.0369, 38.9072],
+  'San Francisco': [-122.4194, 37.7749],
+  'Chicago': [-87.6298, 41.8781],
   'Royaume-Uni': [-3.4360, 55.3781],
   'UK': [-3.4360, 55.3781],
   'Londres': [-0.1276, 51.5074],
+  'London': [-0.1276, 51.5074],
   'Allemagne': [10.4515, 51.1657],
   'Berlin': [13.4050, 52.5200],
+  'Munich': [11.5820, 48.1351],
   'Espagne': [-3.7038, 40.4168],
   'Madrid': [-3.7038, 40.4168],
+  'Barcelone': [2.1734, 41.3851],
   'Italie': [12.4964, 41.9028],
   'Rome': [12.4964, 41.9028],
+  'Milan': [9.1900, 45.4642],
   'Chine': [104.1954, 35.8617],
   'Pékin': [116.4074, 39.9042],
   'Beijing': [116.4074, 39.9042],
   'Shanghai': [121.4737, 31.2304],
+  'Hong Kong': [114.1694, 22.3193],
   'Japon': [138.2529, 36.2048],
   'Tokyo': [139.6917, 35.6895],
+  'Osaka': [135.5023, 34.6937],
   'Russie': [105.3188, 61.5240],
   'Moscou': [37.6173, 55.7558],
+  'Moscow': [37.6173, 55.7558],
   'Brésil': [-51.9253, -14.2350],
   'Rio': [-43.1729, -22.9068],
+  'São Paulo': [-46.6333, -23.5505],
   'Inde': [78.9629, 20.5937],
   'Mumbai': [72.8777, 19.0760],
+  'New Delhi': [77.2090, 28.6139],
   'Australie': [133.7751, -25.2744],
   'Sydney': [151.2093, -33.8688],
+  'Melbourne': [144.9631, -37.8136],
   'Canada': [-106.3468, 56.1304],
   'Toronto': [-79.3832, 43.6532],
-  'Monde': [0, 20],
-  'International': [0, 20],
+  'Vancouver': [-123.1207, 49.2827],
+  'Monde': [10, 25],
+  'International': [10, 25],
+  'Global': [10, 25],
   'Europe': [15.2551, 54.5260],
   'Asie': [100.6197, 34.0479],
   'Afrique': [21.7587, 1.6508],
   'Amérique': [-95.7129, 37.0902],
+  'Moyen-Orient': [45.0792, 29.3117],
+  'Océanie': [140.0188, -22.7359],
 };
 
 const getCoordinatesForLocation = (location: string): [number, number] => {
-  const normalizedLocation = location.toLowerCase();
+  const normalizedLocation = location.toLowerCase().trim();
   
+  // Direct match
+  for (const [key, coords] of Object.entries(locationCoordinates)) {
+    if (normalizedLocation === key.toLowerCase()) {
+      return coords;
+    }
+  }
+  
+  // Partial match
   for (const [key, coords] of Object.entries(locationCoordinates)) {
     if (normalizedLocation.includes(key.toLowerCase()) || key.toLowerCase().includes(normalizedLocation)) {
       return coords;
     }
   }
   
-  // Random position if not found
-  return [Math.random() * 360 - 180, Math.random() * 140 - 70];
+  // Default to "Monde" coordinates with slight offset for uniqueness
+  const hash = location.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return [
+    locationCoordinates['Monde'][0] + (hash % 60) - 30,
+    locationCoordinates['Monde'][1] + (hash % 30) - 15
+  ];
 };
 
 const NewsMap = () => {
@@ -102,7 +133,7 @@ const NewsMap = () => {
         if (data?.token) {
           setMapboxToken(data.token);
         } else {
-          setError('Token Mapbox non configuré');
+          setError('Token Mapbox non configuré. Veuillez ajouter MAPBOX_PUBLIC_TOKEN dans les secrets.');
         }
       } catch (err) {
         console.error('Error fetching token:', err);
@@ -162,7 +193,7 @@ const NewsMap = () => {
       style: 'mapbox://styles/mapbox/dark-v11',
       projection: 'globe',
       zoom: 1.5,
-      center: [2, 30],
+      center: [10, 25],
       pitch: 30,
     });
 
@@ -220,16 +251,15 @@ const NewsMap = () => {
     markersRef.current = [];
 
     locationGroups.forEach((group) => {
-      // Create custom marker element
       const el = document.createElement('div');
       el.className = 'news-marker';
       el.innerHTML = `
         <div class="relative cursor-pointer group">
-          <div class="w-10 h-10 rounded-full bg-[#A800FF] flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-[#A800FF]/50 transition-transform group-hover:scale-110">
+          <div class="w-12 h-12 rounded-full bg-[#A800FF] flex items-center justify-center text-white font-bold text-sm shadow-lg shadow-[#A800FF]/50 transition-all duration-300 group-hover:scale-125 group-hover:shadow-[#A800FF]/70">
             ${group.news.length}
           </div>
-          <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-[#A800FF]"></div>
-          <div class="absolute inset-0 rounded-full bg-[#A800FF] animate-ping opacity-30"></div>
+          <div class="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-t-[6px] border-l-transparent border-r-transparent border-t-[#A800FF]"></div>
+          <div class="absolute inset-0 rounded-full bg-[#A800FF] animate-ping opacity-20"></div>
         </div>
       `;
 
@@ -261,9 +291,10 @@ const NewsMap = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Card className="max-w-md">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">
+            <Globe className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-destructive mb-4">{error}</p>
             <Link to="/">
               <Button variant="outline">Retour à l'accueil</Button>
@@ -288,7 +319,9 @@ const NewsMap = () => {
             <MapPin className="h-5 w-5 text-primary" />
             Carte des Actualités
           </h1>
-          <p className="text-xs text-muted-foreground">{news.length} actualités dans {locationGroups.length} lieux</p>
+          <p className="text-xs text-muted-foreground">
+            {news.length} actualités dans {locationGroups.length} lieux
+          </p>
         </div>
       </div>
 
@@ -302,6 +335,18 @@ const NewsMap = () => {
             <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-muted-foreground">Chargement de la carte...</p>
           </div>
+        </div>
+      )}
+
+      {/* No news message */}
+      {!loading && news.length === 0 && (
+        <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
+          <Card className="max-w-sm pointer-events-auto">
+            <CardContent className="p-6 text-center">
+              <Globe className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <p className="text-muted-foreground">Aucune actualité disponible</p>
+            </CardContent>
+          </Card>
         </div>
       )}
 
