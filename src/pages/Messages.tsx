@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Search, Send, Mic, Image as ImageIcon, StopCircle } from "lucide-react";
+import { ArrowLeft, Search, Send, Mic, Image as ImageIcon, StopCircle, Megaphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Textarea } from "@/components/ui/textarea";
+import { SystemMessagesPanel } from "@/components/SystemMessagesPanel";
 
 interface Conversation {
   id: string;
@@ -55,7 +55,9 @@ const Messages = () => {
   const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
   const [friends, setFriends] = useState<Friend[]>([]);
   const [filteredFriends, setFilteredFriends] = useState<Friend[]>([]);
+  const [showSystemMessages, setShowSystemMessages] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     checkUser();
@@ -75,16 +77,23 @@ const Messages = () => {
       );
       setFilteredFriends(filtered);
     } else {
-      setFilteredFriends(friends);
+      setFilteredFriends([]);
     }
   }, [searchUsername, friends]);
 
   useEffect(() => {
     if (selectedConversation) {
       fetchMessages();
-      subscribeToMessages();
+      const unsubscribe = subscribeToMessages();
+      return () => {
+        if (unsubscribe) unsubscribe();
+      };
     }
   }, [selectedConversation]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   const checkUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -99,7 +108,6 @@ const Messages = () => {
   const fetchFriends = async () => {
     if (!currentUserId) return;
 
-    // Get mutual friends (users who follow each other)
     const { data: following } = await supabase
       .from("subscriptions")
       .select("following_id")
@@ -123,7 +131,6 @@ const Messages = () => {
 
         if (profiles) {
           setFriends(profiles);
-          setFilteredFriends(profiles);
         }
       }
     }
@@ -137,7 +144,10 @@ const Messages = () => {
       .select('conversation_id, conversations(updated_at)')
       .eq('user_id', currentUserId);
 
-    if (!participants) return;
+    if (!participants || participants.length === 0) {
+      setConversations([]);
+      return;
+    }
 
     const conversationIds = participants.map(p => p.conversation_id);
     
@@ -156,7 +166,7 @@ const Messages = () => {
           .eq('conversation_id', convId)
           .order('created_at', { ascending: false })
           .limit(1)
-          .single();
+          .maybeSingle();
 
         const participant = participants.find(p => p.conversation_id === convId);
 
@@ -199,9 +209,7 @@ const Messages = () => {
           table: 'messages',
           filter: `conversation_id=eq.${selectedConversation}`,
         },
-        (payload) => {
-          fetchMessages();
-        }
+        () => fetchMessages()
       )
       .subscribe();
 
@@ -210,22 +218,32 @@ const Messages = () => {
     };
   };
 
-  const startNewConversation = async () => {
-    if (!searchUsername || !currentUserId) return;
+  const startNewConversation = async (friendId?: string, friendUsername?: string) => {
+    if (!currentUserId) return;
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('username', searchUsername)
-      .single();
+    const targetId = friendId;
+    const targetUsername = friendUsername || searchUsername;
 
-    if (!profile) {
-      toast({
-        title: "Erreur",
-        description: "Utilisateur introuvable",
-        variant: "destructive",
-      });
-      return;
+    if (!targetId && !targetUsername) return;
+
+    let profileId = targetId;
+
+    if (!profileId) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('username', targetUsername)
+        .maybeSingle();
+
+      if (!profile) {
+        toast({
+          title: "Erreur",
+          description: "Utilisateur introuvable",
+          variant: "destructive",
+        });
+        return;
+      }
+      profileId = profile.id;
     }
 
     // Check if conversation exists
@@ -240,12 +258,13 @@ const Messages = () => {
           .from('conversation_participants')
           .select('user_id')
           .eq('conversation_id', p.conversation_id)
-          .eq('user_id', profile.id)
-          .single();
+          .eq('user_id', profileId)
+          .maybeSingle();
 
         if (otherParticipant) {
           setSelectedConversation(p.conversation_id);
           setSearchUsername("");
+          setFilteredFriends([]);
           return;
         }
       }
@@ -267,13 +286,26 @@ const Messages = () => {
       return;
     }
 
-    await supabase.from('conversation_participants').insert([
-      { conversation_id: newConv.id, user_id: currentUserId },
-      { conversation_id: newConv.id, user_id: profile.id },
-    ]);
+    // Add participants
+    const { error: participantsError } = await supabase
+      .from('conversation_participants')
+      .insert([
+        { conversation_id: newConv.id, user_id: currentUserId },
+        { conversation_id: newConv.id, user_id: profileId },
+      ]);
+
+    if (participantsError) {
+      toast({
+        title: "Erreur",
+        description: "Impossible d'ajouter les participants",
+        variant: "destructive",
+      });
+      return;
+    }
 
     setSelectedConversation(newConv.id);
     setSearchUsername("");
+    setFilteredFriends([]);
     fetchConversations();
   };
 
@@ -325,20 +357,12 @@ const Messages = () => {
 
     const messageType = file.type.startsWith("image/") ? "image" : "file";
 
-    const { error } = await supabase.from("messages").insert({
+    await supabase.from("messages").insert({
       conversation_id: selectedConversation,
       sender_id: currentUserId,
-      media_url: filePath,
+      media_url: data.publicUrl,
       message_type: messageType,
     });
-
-    if (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible d'envoyer le fichier.",
-        variant: "destructive",
-      });
-    }
 
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -396,20 +420,16 @@ const Messages = () => {
       return;
     }
 
-    const { error } = await supabase.from("messages").insert({
+    const { data } = supabase.storage
+      .from("message-media")
+      .getPublicUrl(filePath);
+
+    await supabase.from("messages").insert({
       conversation_id: selectedConversation,
       sender_id: currentUserId,
-      media_url: filePath,
+      media_url: data.publicUrl,
       message_type: "voice",
     });
-
-    if (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible d'envoyer le message vocal.",
-        variant: "destructive",
-      });
-    }
   };
 
   if (loading) {
@@ -431,168 +451,196 @@ const Messages = () => {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <h1 className="text-xl font-bold text-foreground">Messages</h1>
-            </div>
-            
-            <div className="flex gap-2">
-              <Input
-                placeholder="Rechercher un ami..."
-                value={searchUsername}
-                onChange={(e) => setSearchUsername(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && startNewConversation()}
-              />
-              <Button onClick={startNewConversation} size="icon">
-                <Search className="h-4 w-4" />
+              <div className="flex-1" />
+              <Button 
+                onClick={() => setShowSystemMessages(!showSystemMessages)} 
+                variant="ghost" 
+                size="icon"
+                className={showSystemMessages ? "bg-primary/20" : ""}
+              >
+                <Megaphone className="h-5 w-5" />
               </Button>
             </div>
-
-            {/* Friends suggestions */}
-            {searchUsername && filteredFriends.length > 0 && (
-              <div className="mt-2 border border-border rounded-lg max-h-40 overflow-y-auto">
-                {filteredFriends.map((friend) => (
-                  <div
-                    key={friend.id}
-                    onClick={() => {
-                      setSearchUsername(friend.username);
-                      startNewConversation();
-                    }}
-                    className="p-2 hover:bg-accent/10 cursor-pointer flex items-center gap-2"
-                  >
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={friend.avatar_url || undefined} />
-                      <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                        {friend.username[0].toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-sm">@{friend.username}</span>
-                  </div>
-                ))}
+            
+            <div className="relative">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Rechercher un ami..."
+                  value={searchUsername}
+                  onChange={(e) => setSearchUsername(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && startNewConversation()}
+                />
+                <Button onClick={() => startNewConversation()} size="icon">
+                  <Search className="h-4 w-4" />
+                </Button>
               </div>
-            )}
+
+              {/* Friends suggestions dropdown */}
+              {filteredFriends.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 border border-border rounded-lg bg-card max-h-48 overflow-y-auto z-10 shadow-lg">
+                  {filteredFriends.map((friend) => (
+                    <div
+                      key={friend.id}
+                      onClick={() => startNewConversation(friend.id, friend.username)}
+                      className="p-3 hover:bg-accent/10 cursor-pointer flex items-center gap-3"
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={friend.avatar_url || undefined} />
+                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
+                          {friend.username[0].toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-sm font-medium">@{friend.username}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
-            {conversations.map((conv) => (
-              <div
-                key={conv.id}
-                onClick={() => setSelectedConversation(conv.id)}
-                className={`p-4 cursor-pointer hover:bg-accent/5 border-b border-border ${
-                  selectedConversation === conv.id ? 'bg-accent/10' : ''
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarImage src={conv.otherUser.avatar_url || undefined} />
-                    <AvatarFallback className="bg-primary text-primary-foreground">
-                      {conv.otherUser.username[0].toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground">@{conv.otherUser.username}</p>
-                    <p className="text-sm text-muted-foreground truncate">
-                      {conv.lastMessage || 'Aucun message'}
-                    </p>
-                  </div>
-                </div>
+            {conversations.length === 0 ? (
+              <div className="p-4 text-center text-muted-foreground">
+                <p>Aucune conversation</p>
+                <p className="text-sm mt-1">Recherchez un ami pour démarrer</p>
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Chat Window */}
-        <div className="flex-1 flex flex-col">
-          {selectedConversation ? (
-            <>
-              <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex gap-3 ${
-                      msg.sender_id === currentUserId ? 'flex-row-reverse' : ''
-                    }`}
-                  >
-                    <Avatar className="h-8 w-8">
-                      <AvatarImage src={msg.profiles.avatar_url || undefined} />
-                      <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                        {msg.profiles.username[0].toUpperCase()}
+            ) : (
+              conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  onClick={() => setSelectedConversation(conv.id)}
+                  className={`p-4 cursor-pointer hover:bg-accent/5 border-b border-border ${
+                    selectedConversation === conv.id ? 'bg-accent/10' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Avatar>
+                      <AvatarImage src={conv.otherUser.avatar_url || undefined} />
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {conv.otherUser.username[0].toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
-                    <div
-                      className={`max-w-md p-3 rounded-lg ${
-                        msg.sender_id === currentUserId
-                          ? 'bg-primary text-primary-foreground'
-                          : 'bg-card'
-                      }`}
-                    >
-                      {msg.message_type === 'text' && <p>{msg.content}</p>}
-                      {msg.message_type === 'image' && msg.media_url && (
-                        <img 
-                          src={supabase.storage.from("message-media").getPublicUrl(msg.media_url).data.publicUrl} 
-                          alt="Image" 
-                          className="rounded max-w-sm" 
-                        />
-                      )}
-                      {msg.message_type === 'voice' && msg.media_url && (
-                        <audio 
-                          src={supabase.storage.from("message-media").getPublicUrl(msg.media_url).data.publicUrl} 
-                          controls 
-                          className="max-w-sm" 
-                        />
-                      )}
-                      <p className="text-xs opacity-70 mt-1">
-                        {formatDistanceToNow(new Date(msg.created_at), {
-                          addSuffix: true,
-                          locale: fr,
-                        })}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-foreground">@{conv.otherUser.username}</p>
+                      <p className="text-sm text-muted-foreground truncate">
+                        {conv.lastMessage || 'Aucun message'}
                       </p>
                     </div>
                   </div>
-                ))}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Chat Area or System Messages */}
+        <div className="flex-1 flex flex-col">
+          {showSystemMessages ? (
+            <div className="flex-1 p-6 overflow-y-auto">
+              <SystemMessagesPanel />
+            </div>
+          ) : selectedConversation ? (
+            <>
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.map((msg) => {
+                  const isOwn = msg.sender_id === currentUserId;
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div className={`flex gap-2 max-w-[70%] ${isOwn ? 'flex-row-reverse' : ''}`}>
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src={msg.profiles?.avatar_url || undefined} />
+                          <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                            {msg.profiles?.username?.[0]?.toUpperCase() || '?'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div
+                            className={`rounded-2xl px-4 py-2 ${
+                              isOwn
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-muted'
+                            }`}
+                          >
+                            {msg.message_type === 'text' && (
+                              <p className="whitespace-pre-wrap">{msg.content}</p>
+                            )}
+                            {msg.message_type === 'image' && msg.media_url && (
+                              <img
+                                src={msg.media_url}
+                                alt="Image"
+                                className="max-w-xs rounded-lg"
+                              />
+                            )}
+                            {msg.message_type === 'voice' && msg.media_url && (
+                              <audio controls src={msg.media_url} className="max-w-xs" />
+                            )}
+                          </div>
+                          <p className={`text-xs text-muted-foreground mt-1 ${isOwn ? 'text-right' : ''}`}>
+                            {formatDistanceToNow(new Date(msg.created_at), {
+                              addSuffix: true,
+                              locale: fr,
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <div ref={messagesEndRef} />
               </div>
 
+              {/* Input Area */}
               <div className="p-4 border-t border-border">
-                <div className="flex gap-2 items-end">
+                <div className="flex items-center gap-2">
                   <input
                     type="file"
                     ref={fileInputRef}
                     onChange={handleFileUpload}
-                    accept="image/*"
                     className="hidden"
+                    accept="image/*"
                   />
-                  <Textarea
-                    placeholder="Votre message..."
+                  <Button
+                    onClick={() => fileInputRef.current?.click()}
+                    variant="ghost"
+                    size="icon"
+                  >
+                    <ImageIcon className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    onClick={isRecording ? stopRecording : startRecording}
+                    variant="ghost"
+                    size="icon"
+                    className={isRecording ? 'text-destructive' : ''}
+                  >
+                    {isRecording ? (
+                      <StopCircle className="h-5 w-5" />
+                    ) : (
+                      <Mic className="h-5 w-5" />
+                    )}
+                  </Button>
+                  <Input
+                    placeholder="Écrivez un message..."
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        sendMessage();
-                      }
-                    }}
-                    className="resize-none"
-                    rows={2}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                    className="flex-1"
                   />
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="icon" onClick={() => fileInputRef.current?.click()}>
-                      <ImageIcon className="h-4 w-4" />
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="icon"
-                      onClick={isRecording ? stopRecording : startRecording}
-                      className={isRecording ? "bg-destructive text-destructive-foreground" : ""}
-                    >
-                      {isRecording ? <StopCircle className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                    </Button>
-                    <Button onClick={sendMessage} size="icon">
-                      <Send className="h-4 w-4" />
-                    </Button>
-                  </div>
+                  <Button onClick={sendMessage} size="icon">
+                    <Send className="h-5 w-5" />
+                  </Button>
                 </div>
               </div>
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center text-muted-foreground">
-              <p>Sélectionnez une conversation pour commencer</p>
+              <div className="text-center">
+                <p className="text-lg">Sélectionnez une conversation</p>
+                <p className="text-sm mt-1">ou recherchez un ami pour commencer</p>
+              </div>
             </div>
           )}
         </div>
