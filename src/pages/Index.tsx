@@ -9,7 +9,7 @@ import { GroupsList } from "@/components/GroupsList";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText } from "lucide-react";
+import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText, Crown } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -240,6 +240,15 @@ const Index = () => {
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   Charte
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/pricing')}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Crown className="h-4 w-4 mr-2" />
+                  Premium
                 </Button>
               </nav>
             </div>

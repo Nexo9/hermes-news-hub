@@ -1,1 +1,10 @@
 project_id = "zicbcosylrtvxroojqqh"
+
+[functions.get-mapbox-token]
+verify_jwt = false
+
+[functions.send-email]
+verify_jwt = false
+
+[functions.scrape-news]
+verify_jwt = false

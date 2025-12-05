@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Pencil, ArrowLeft, MessageSquare, Flag } from "lucide-react";
+import { Pencil, ArrowLeft, MessageSquare, Flag, BadgeCheck, Star } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { FollowButton } from "@/components/FollowButton";
@@ -16,6 +16,11 @@ interface Profile {
   bio: string | null;
   avatar_url: string | null;
   banner_url: string | null;
+}
+
+interface UserSubscription {
+  plan_type: string;
+  is_certified: boolean;
 }
 
 interface Thread {
@@ -38,6 +43,7 @@ const Profile = () => {
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
   const [showReportDialog, setShowReportDialog] = useState(false);
+  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -79,6 +85,17 @@ const Profile = () => {
 
       setFollowersCount(followersCount || 0);
       setFollowingCount(followingCount || 0);
+
+      // Fetch subscription/certification status
+      const { data: subData } = await supabase
+        .from('user_subscriptions')
+        .select('plan_type, is_certified')
+        .eq('user_id', profileData.id)
+        .maybeSingle();
+
+      if (subData) {
+        setSubscription(subData);
+      }
 
       const { data: threadsData, error: threadsError } = await supabase
         .from('threads')
@@ -229,7 +246,18 @@ const Profile = () => {
             <div className="flex-1 bg-background/95 backdrop-blur-sm rounded-lg p-4 sm:pb-3">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <h1 className="text-xl sm:text-2xl font-bold text-foreground">@{profile.username}</h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl sm:text-2xl font-bold text-foreground">@{profile.username}</h1>
+                    {subscription?.is_certified && (
+                      <div className="flex items-center">
+                        {subscription.plan_type === 'elite' ? (
+                          <Star className="h-5 w-5 text-amber-500 fill-amber-500" />
+                        ) : (
+                          <BadgeCheck className="h-5 w-5 text-primary" />
+                        )}
+                      </div>
+                    )}
+                  </div>
                   {profile.bio && (
                     <p className="text-muted-foreground mt-1 text-sm sm:text-base">{profile.bio}</p>
                   )}
