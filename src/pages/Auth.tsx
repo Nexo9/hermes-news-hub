@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Mail, Lock, User } from "lucide-react";
+import { Sparkles, Mail, Lock, User, Crown } from "lucide-react";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -27,6 +27,20 @@ const Auth = () => {
     }
   };
 
+  const sendWelcomeEmail = async (userEmail: string, userName: string) => {
+    try {
+      await supabase.functions.invoke("send-email", {
+        body: {
+          type: "welcome",
+          email: userEmail,
+          data: { username: userName },
+        },
+      });
+    } catch (error) {
+      console.error("Error sending welcome email:", error);
+    }
+  };
+
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -43,7 +57,7 @@ const Auth = () => {
           return;
         }
 
-        const { error } = await supabase.auth.signUp({
+        const { data, error } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -56,10 +70,20 @@ const Auth = () => {
 
         if (error) throw error;
 
+        // Send welcome email
+        if (data.user) {
+          await sendWelcomeEmail(email, username);
+        }
+
         toast({
-          title: "Compte créé",
-          description: "Vérifiez votre email pour confirmer votre compte",
+          title: "Compte créé ! 🎉",
+          description: "Bienvenue sur HERMÈS ! Vérifiez votre email.",
         });
+        
+        // Auto login after signup (if email confirmation is disabled)
+        if (data.session) {
+          navigate("/");
+        }
       } else {
         const { error } = await supabase.auth.signInWithPassword({
           email,
@@ -75,9 +99,16 @@ const Auth = () => {
         navigate("/");
       }
     } catch (error: any) {
+      let errorMessage = error.message || "Une erreur est survenue";
+      if (error.message?.includes("User already registered")) {
+        errorMessage = "Un compte existe déjà avec cet email";
+      } else if (error.message?.includes("Invalid login credentials")) {
+        errorMessage = "Email ou mot de passe incorrect";
+      }
+      
       toast({
         title: "Erreur",
-        description: error.message || "Une erreur est survenue",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -145,6 +176,7 @@ const Auth = () => {
                 placeholder="••••••••"
                 className="pl-10 bg-background border-border"
                 required
+                minLength={6}
               />
             </div>
           </div>
@@ -167,6 +199,17 @@ const Auth = () => {
           >
             {isSignUp ? "Déjà un compte ? Se connecter" : "Pas de compte ? S'inscrire"}
           </button>
+        </div>
+
+        {/* Premium link */}
+        <div className="mt-4 text-center">
+          <Link
+            to="/pricing"
+            className="inline-flex items-center gap-2 text-xs text-primary hover:underline"
+          >
+            <Crown className="w-3 h-3" />
+            Découvrir les plans Premium
+          </Link>
         </div>
       </Card>
     </div>
