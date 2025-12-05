@@ -103,6 +103,36 @@ export type Database = {
         }
         Relationships: []
       }
+      email_verifications: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          is_verified: boolean
+          user_id: string | null
+          verification_code: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          is_verified?: boolean
+          user_id?: string | null
+          verification_code: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          is_verified?: boolean
+          user_id?: string | null
+          verification_code?: string
+        }
+        Relationships: []
+      }
       group_members: {
         Row: {
           group_id: string
@@ -569,6 +599,39 @@ export type Database = {
           created_at?: string | null
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_subscriptions: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          is_certified: boolean
+          plan_type: string
+          started_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_certified?: boolean
+          plan_type?: string
+          started_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          is_certified?: boolean
+          plan_type?: string
+          started_at?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
