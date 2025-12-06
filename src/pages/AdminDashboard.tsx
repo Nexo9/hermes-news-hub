@@ -12,16 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Megaphone, Users, Settings, Newspaper, MessageSquare, Trash2, 
-  BarChart3, Shield, ArrowLeft, Search, UserX, Eye, RefreshCw,
-  TrendingUp, Heart, Bookmark, Share2, Calendar
+  BarChart3, Shield, ArrowLeft, Search, RefreshCw,
+  TrendingUp, Heart, Bookmark, Share2, Calendar, Bot, Palette
 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +26,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { AntikIAPanel } from "@/components/AntikIAPanel";
+import { AdminUserManagement } from "@/components/AdminUserManagement";
+import { ThemeSelector } from "@/components/ThemeSelector";
+import { SystemMessagesPanel } from "@/components/SystemMessagesPanel";
 
 interface Announcement {
   id: string;
@@ -43,14 +40,6 @@ interface Announcement {
   profiles: {
     username: string;
   };
-}
-
-interface Profile {
-  id: string;
-  username: string;
-  avatar_url: string | null;
-  bio: string | null;
-  created_at: string;
 }
 
 interface Thread {
@@ -76,8 +65,8 @@ interface Stats {
 export default function AdminDashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string>("");
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
@@ -89,7 +78,6 @@ export default function AdminDashboard() {
     newUsersToday: 0,
   });
   const [newAnnouncement, setNewAnnouncement] = useState({ title: "", content: "" });
-  const [searchUser, setSearchUser] = useState("");
   const [searchThread, setSearchThread] = useState("");
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -102,18 +90,9 @@ export default function AdminDashboard() {
     if (isAdmin) {
       fetchAllData();
       
-      // Realtime subscriptions
       const announcementsChannel = supabase
         .channel("admin-announcements")
         .on("postgres_changes", { event: "*", schema: "public", table: "announcements" }, () => fetchAnnouncements())
-        .subscribe();
-
-      const profilesChannel = supabase
-        .channel("admin-profiles")
-        .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, () => {
-          fetchProfiles();
-          fetchStats();
-        })
         .subscribe();
 
       const threadsChannel = supabase
@@ -126,7 +105,6 @@ export default function AdminDashboard() {
 
       return () => {
         supabase.removeChannel(announcementsChannel);
-        supabase.removeChannel(profilesChannel);
         supabase.removeChannel(threadsChannel);
       };
     }
@@ -135,7 +113,6 @@ export default function AdminDashboard() {
   const fetchAllData = async () => {
     await Promise.all([
       fetchAnnouncements(),
-      fetchProfiles(),
       fetchThreads(),
       fetchStats(),
     ]);
@@ -147,6 +124,8 @@ export default function AdminDashboard() {
       navigate("/auth");
       return;
     }
+
+    setUserId(user.id);
 
     const { data: roles } = await supabase
       .from("user_roles")
@@ -211,15 +190,6 @@ export default function AdminDashboard() {
     if (data) setAnnouncements(data);
   };
 
-  const fetchProfiles = async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, username, avatar_url, bio, created_at")
-      .order("created_at", { ascending: false });
-
-    if (data) setProfiles(data);
-  };
-
   const fetchThreads = async () => {
     const { data } = await supabase
       .from("threads")
@@ -265,6 +235,19 @@ export default function AdminDashboard() {
       return;
     }
 
+    // Send email to all users about the announcement
+    try {
+      await supabase.functions.invoke("send-email", {
+        body: {
+          type: "announcement",
+          title: newAnnouncement.title,
+          content: newAnnouncement.content,
+        },
+      });
+    } catch (e) {
+      console.log("Email sending skipped");
+    }
+
     toast({
       title: "Annonce créée",
       description: "L'annonce a été publiée avec succès.",
@@ -295,13 +278,9 @@ export default function AdminDashboard() {
     toast({ title: "Thread supprimé", description: "Le thread a été supprimé avec succès." });
   };
 
-  const filteredProfiles = profiles.filter((p) =>
-    p.username.toLowerCase().includes(searchUser.toLowerCase())
-  );
-
   const filteredThreads = threads.filter((t) =>
     t.content.toLowerCase().includes(searchThread.toLowerCase()) ||
-    t.profiles.username.toLowerCase().includes(searchThread.toLowerCase())
+    t.profiles?.username?.toLowerCase().includes(searchThread.toLowerCase())
   );
 
   if (loading) {
@@ -334,10 +313,13 @@ export default function AdminDashboard() {
               <p className="text-muted-foreground">Gérez votre plateforme HERMÈS</p>
             </div>
           </div>
-          <Button onClick={fetchAllData} variant="outline" className="gap-2">
-            <RefreshCw className="h-4 w-4" />
-            Actualiser
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeSelector />
+            <Button onClick={fetchAllData} variant="outline" className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Actualiser
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -422,7 +404,7 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="announcements" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="announcements" className="gap-2">
               <Megaphone className="h-4 w-4" />
               <span className="hidden sm:inline">Annonces</span>
@@ -434,6 +416,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="moderation" className="gap-2">
               <MessageSquare className="h-4 w-4" />
               <span className="hidden sm:inline">Modération</span>
+            </TabsTrigger>
+            <TabsTrigger value="antikia" className="gap-2">
+              <Bot className="h-4 w-4" />
+              <span className="hidden sm:inline">Antik-IA</span>
             </TabsTrigger>
             <TabsTrigger value="settings" className="gap-2">
               <Settings className="h-4 w-4" />
@@ -481,7 +467,7 @@ export default function AdminDashboard() {
                               <h4 className="font-semibold">{announcement.title}</h4>
                               <p className="text-sm text-muted-foreground mt-1">{announcement.content}</p>
                               <p className="text-xs text-muted-foreground mt-2">
-                                Par {announcement.profiles.username} • {new Date(announcement.created_at).toLocaleDateString("fr-FR")}
+                                Par {announcement.profiles?.username} • {new Date(announcement.created_at).toLocaleDateString("fr-FR")}
                               </p>
                             </div>
                             <AlertDialog>
@@ -517,63 +503,7 @@ export default function AdminDashboard() {
 
           {/* Users Tab */}
           <TabsContent value="users">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle>Gestion des utilisateurs ({profiles.length})</CardTitle>
-                    <CardDescription>Consultez et gérez les profils utilisateurs</CardDescription>
-                  </div>
-                  <div className="relative w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Rechercher un utilisateur..."
-                      value={searchUser}
-                      onChange={(e) => setSearchUser(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[500px]">
-                  <div className="space-y-2">
-                    {filteredProfiles.map((profile) => (
-                      <div
-                        key={profile.id}
-                        className="flex items-center gap-4 p-4 border rounded-lg hover:bg-accent/50 transition-colors"
-                      >
-                        <Avatar className="h-12 w-12">
-                          <AvatarImage src={profile.avatar_url || undefined} />
-                          <AvatarFallback>{profile.username[0].toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-semibold">{profile.username}</p>
-                          </div>
-                          {profile.bio && (
-                            <p className="text-sm text-muted-foreground line-clamp-1">{profile.bio}</p>
-                          )}
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            Inscrit le {new Date(profile.created_at).toLocaleDateString("fr-FR")}
-                          </p>
-                        </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/profile/${profile.username}`)}
-                          className="gap-1"
-                        >
-                          <Eye className="h-4 w-4" />
-                          Voir
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
+            <AdminUserManagement />
           </TabsContent>
 
           {/* Moderation Tab */}
@@ -604,7 +534,7 @@ export default function AdminDashboard() {
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <Badge variant="outline">{thread.profiles.username}</Badge>
+                              <Badge variant="outline">{thread.profiles?.username}</Badge>
                               <span className="text-xs text-muted-foreground">
                                 {new Date(thread.created_at).toLocaleString("fr-FR")}
                               </span>
@@ -642,6 +572,11 @@ export default function AdminDashboard() {
                 </ScrollArea>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Antik-IA Tab */}
+          <TabsContent value="antikia">
+            <AntikIAPanel userId={userId} />
           </TabsContent>
 
           {/* Settings Tab */}
@@ -687,17 +622,28 @@ export default function AdminDashboard() {
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg">
+                    <span className="text-sm font-medium">Antik-IA</span>
+                    <Badge variant="outline" className="bg-green-500/20 text-green-600">
+                      En ligne
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-green-500/10 rounded-lg">
                     <span className="text-sm font-medium">Temps réel</span>
                     <Badge variant="outline" className="bg-green-500/20 text-green-600">
                       Actif
                     </Badge>
                   </div>
-                  <div className="p-3 bg-muted rounded-lg">
-                    <p className="text-xs text-muted-foreground">
-                      Note: Les fonctionnalités d'explorateur de fichiers et de terminal ne sont pas disponibles 
-                      dans une application web pour des raisons de sécurité du navigateur.
-                    </p>
-                  </div>
+                </CardContent>
+              </Card>
+
+              {/* System Messages */}
+              <Card className="md:col-span-2">
+                <CardHeader>
+                  <CardTitle>Messages système</CardTitle>
+                  <CardDescription>Envoyez des messages système aux utilisateurs</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <SystemMessagesPanel />
                 </CardContent>
               </Card>
             </div>
