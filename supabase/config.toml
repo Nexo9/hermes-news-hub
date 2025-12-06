@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.scrape-news]
 verify_jwt = false
+
+[functions.antik-ia-chat]
+verify_jwt = false
