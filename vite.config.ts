@@ -1,18 +1,19 @@
-import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react-swc";
-import path from "path";
-import { componentTagger } from "lovable-tagger";
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from "path"
 
-// https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig({
+  plugins: [react()],
   server: {
-    host: "::",
-    port: 8080,
+    host: true, // Nécessaire pour Koyeb
+    port: 8080, // Le port que tu as configuré
+    allowedHosts: [
+      'ambitious-corette-antik-d0c0d2a8.koyeb.app' // Ton URL Koyeb
+    ]
   },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-}));
+})
