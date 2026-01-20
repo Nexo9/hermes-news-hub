@@ -1,20 +1,17 @@
-import path from "path"
-import react from "@vitejs/plugin-react"
-import { defineConfig } from "vite"
+import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react-swc";
+import path from "path";
 
-export default defineConfig({
+// https://vitejs.dev/config/
+export default defineConfig(({ mode }) => ({
+  server: {
+    host: "::",
+    port: 8080,
+  },
   plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  server: {
-    // Indispensable pour que Koyeb puisse accéder au serveur
-    host: true, 
-    // On force le port 8080 car c'est celui que tes logs affichaient
-    port: 8080, 
-    // On autorise toutes les adresses pour corriger l'erreur "Blocked host"
-    allowedHosts: "all" 
-  },
-})
+}));
