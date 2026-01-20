@@ -9,7 +9,7 @@ import { GroupsList } from "@/components/GroupsList";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText, Crown } from "lucide-react";
+import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText, Crown, Gamepad2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -249,6 +249,15 @@ const Index = () => {
                 >
                   <Crown className="h-4 w-4 mr-2" />
                   Premium
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/games')}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Gamepad2 className="h-4 w-4 mr-2" />
+                  Mini-Jeux
                 </Button>
               </nav>
             </div>

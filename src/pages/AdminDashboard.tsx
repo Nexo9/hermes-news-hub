@@ -314,7 +314,7 @@ export default function AdminDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <ThemeSelector />
+            <ThemeSelector isPremium={true} isAdmin={true} />
             <Button onClick={fetchAllData} variant="outline" className="gap-2">
               <RefreshCw className="h-4 w-4" />
               Actualiser
