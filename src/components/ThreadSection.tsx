@@ -1,17 +1,21 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Send, MessageSquare, Sparkles, Heart, Share2 } from "lucide-react";
+import { MessageCircle, MoreHorizontal, Heart, Repeat2, Share, Bookmark, X } from "lucide-react";
 import { ThreadReplies } from "./ThreadReplies";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Thread {
   id: string;
@@ -22,6 +26,9 @@ interface Thread {
     username: string;
     avatar_url: string | null;
   } | null;
+  replyCount?: number;
+  likeCount?: number;
+  isLiked?: boolean;
 }
 
 interface ThreadSectionProps {
@@ -36,11 +43,24 @@ export const ThreadSection = ({ newsId, newsTitle, isOpen, onClose }: ThreadSect
   const [newThread, setNewThread] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [expandedThread, setExpandedThread] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getUser();
+      setUser(data.user);
+      if (data.user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("username, avatar_url")
+          .eq("id", data.user.id)
+          .single();
+        setUserProfile(profile);
+      }
+    };
+    fetchUser();
   }, []);
 
   useEffect(() => {
@@ -69,21 +89,29 @@ export const ThreadSection = ({ newsId, newsTitle, isOpen, onClose }: ThreadSect
 
     if (threadsData && threadsData.length > 0) {
       const userIds = [...new Set(threadsData.map(t => t.user_id))];
-      const { data: profilesData, error: profilesError } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url")
-        .in("id", userIds);
+      const threadIds = threadsData.map(t => t.id);
 
-      if (!profilesError && profilesData) {
-        const profilesMap = new Map(profilesData.map(p => [p.id, p]));
-        const threadsWithProfiles = threadsData.map(thread => ({
-          ...thread,
-          profiles: profilesMap.get(thread.user_id) || null,
-        }));
-        setThreads(threadsWithProfiles);
-      } else {
-        setThreads(threadsData.map(t => ({ ...t, profiles: null })));
-      }
+      const [profilesResult, repliesCountResult] = await Promise.all([
+        supabase.from("profiles").select("id, username, avatar_url").in("id", userIds),
+        supabase.from("thread_replies").select("thread_id").in("thread_id", threadIds),
+      ]);
+
+      const profilesMap = new Map(profilesResult.data?.map(p => [p.id, p]) || []);
+      
+      // Count replies per thread
+      const replyCountMap = new Map<string, number>();
+      repliesCountResult.data?.forEach(r => {
+        replyCountMap.set(r.thread_id, (replyCountMap.get(r.thread_id) || 0) + 1);
+      });
+
+      const threadsWithProfiles = threadsData.map(thread => ({
+        ...thread,
+        profiles: profilesMap.get(thread.user_id) || null,
+        replyCount: replyCountMap.get(thread.id) || 0,
+        likeCount: Math.floor(Math.random() * 50), // Placeholder for likes
+        isLiked: false,
+      }));
+      setThreads(threadsWithProfiles);
     } else {
       setThreads([]);
     }
@@ -111,172 +139,209 @@ export const ThreadSection = ({ newsId, newsTitle, isOpen, onClose }: ThreadSect
       fetchThreads();
       toast({
         title: "Publié",
-        description: "Votre analyse a été partagée",
+        description: "Votre commentaire a été partagé",
       });
     }
 
     setIsLoading(false);
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[85vh] bg-gradient-to-b from-card to-card/95 border-primary/20">
-        <DialogHeader className="pb-4 border-b border-border/50">
-          <DialogTitle className="text-xl font-bold text-foreground pr-8 flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            {newsTitle}
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            {threads.length} contribution{threads.length !== 1 ? "s" : ""} de la communauté
-          </p>
-        </DialogHeader>
+  const toggleLike = (threadId: string) => {
+    setThreads(prev => prev.map(t => 
+      t.id === threadId 
+        ? { ...t, isLiked: !t.isLiked, likeCount: t.isLiked ? (t.likeCount || 1) - 1 : (t.likeCount || 0) + 1 }
+        : t
+    ));
+  };
 
-        <div className="flex flex-col gap-4 h-full">
-          {/* Thread Input */}
-          {user ? (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-3 p-4 bg-gradient-to-r from-primary/5 to-purple-500/5 rounded-xl border border-primary/10"
-            >
-              <div className="flex items-start gap-3">
-                <Avatar className="w-10 h-10 ring-2 ring-primary/20">
+  return (
+    <Sheet open={isOpen} onOpenChange={onClose}>
+      <SheetContent 
+        side="right" 
+        className="w-full sm:max-w-lg p-0 bg-background border-l border-border overflow-hidden flex flex-col"
+      >
+        {/* Header */}
+        <SheetHeader className="px-4 py-3 border-b border-border flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <SheetTitle className="text-lg font-bold">Commentaires</SheetTitle>
+            <Button variant="ghost" size="icon" onClick={() => onClose()} className="h-8 w-8">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          <p className="text-sm text-muted-foreground line-clamp-1 pr-8">{newsTitle}</p>
+        </SheetHeader>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Compose Tweet Box */}
+          {user && (
+            <div className="p-4 border-b border-border">
+              <div className="flex gap-3">
+                <Avatar className="h-10 w-10 flex-shrink-0">
+                  <AvatarImage src={userProfile?.avatar_url || undefined} />
                   <AvatarFallback className="bg-primary text-primary-foreground">
-                    {user.email?.[0]?.toUpperCase() || 'U'}
+                    {userProfile?.username?.[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <Textarea
-                    placeholder="Partagez votre analyse neutre et constructive..."
+                    placeholder="Partagez votre analyse..."
                     value={newThread}
                     onChange={(e) => setNewThread(e.target.value)}
-                    className="min-h-[80px] bg-background/50 border-border/50 focus:border-primary resize-none"
+                    className="min-h-[80px] border-0 bg-transparent resize-none focus-visible:ring-0 p-0 text-base placeholder:text-muted-foreground/60"
                   />
+                  <div className="flex justify-end mt-2">
+                    <Button
+                      onClick={handleSubmit}
+                      disabled={!newThread.trim() || isLoading}
+                      size="sm"
+                      className="rounded-full px-4"
+                    >
+                      {isLoading ? "Publication..." : "Publier"}
+                    </Button>
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-end">
-                <Button
-                  onClick={handleSubmit}
-                  disabled={!newThread.trim() || isLoading}
-                  className="gap-2 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90"
-                >
-                  <Send className="w-4 h-4" />
-                  Publier
-                </Button>
-              </div>
-            </motion.div>
-          ) : (
-            <div className="p-4 bg-muted/30 rounded-xl text-center text-muted-foreground border border-border/50">
-              <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              Connectez-vous pour participer aux discussions
+            </div>
+          )}
+
+          {!user && (
+            <div className="p-6 border-b border-border text-center">
+              <MessageCircle className="w-10 h-10 mx-auto mb-3 text-muted-foreground/50" />
+              <p className="text-muted-foreground text-sm">Connectez-vous pour participer</p>
             </div>
           )}
 
           {/* Threads List */}
-          <ScrollArea className="flex-1 pr-4 -mr-4">
-            {threads.length === 0 ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex flex-col items-center justify-center py-12 text-muted-foreground"
-              >
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary/20 to-purple-500/20 flex items-center justify-center mb-4">
-                  <MessageSquare className="w-10 h-10 opacity-50" />
-                </div>
-                <p className="font-medium">Aucune discussion pour le moment</p>
-                <p className="text-sm">Soyez le premier à partager votre analyse</p>
-              </motion.div>
-            ) : (
-              <AnimatePresence mode="popLayout">
-                <div className="space-y-4">
-                  {threads.map((thread, index) => (
-                    <motion.div
-                      key={thread.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="group"
-                    >
-                      <div className="p-4 bg-gradient-to-r from-background to-background/80 rounded-xl border border-border/50 hover:border-primary/30 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
-                        <div className="flex gap-3">
-                          <Avatar className="w-10 h-10 ring-2 ring-primary/10 group-hover:ring-primary/30 transition-all">
-                            <AvatarImage src={thread.profiles?.avatar_url || undefined} />
-                            <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white">
-                              {thread.profiles?.username?.[0]?.toUpperCase() || 'U'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-semibold text-foreground hover:text-primary cursor-pointer transition-colors">
-                                @{thread.profiles?.username || 'Utilisateur'}
-                              </span>
-                              <span className="text-muted-foreground">•</span>
-                              <span className="text-xs text-muted-foreground">
-                                {formatDistanceToNow(new Date(thread.created_at), {
-                                  addSuffix: true,
-                                  locale: fr,
-                                })}
-                              </span>
-                            </div>
-                            <p className="text-foreground leading-relaxed whitespace-pre-wrap">
-                              {thread.content}
-                            </p>
-                            
-                            {/* Action buttons */}
-                            <div className="flex items-center gap-4 pt-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-muted-foreground hover:text-red-500"
-                              >
-                                <Heart className="h-4 w-4 mr-1" />
-                                <span className="text-xs">J'aime</span>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-muted-foreground hover:text-primary"
-                                onClick={() => setExpandedThread(
-                                  expandedThread === thread.id ? null : thread.id
-                                )}
-                              >
-                                <MessageSquare className="h-4 w-4 mr-1" />
-                                <span className="text-xs">Répondre</span>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 px-2 text-muted-foreground hover:text-blue-500"
-                              >
-                                <Share2 className="h-4 w-4 mr-1" />
-                                <span className="text-xs">Partager</span>
-                              </Button>
-                            </div>
-                            
-                            {/* Thread Replies */}
-                            <AnimatePresence>
-                              {expandedThread === thread.id && (
-                                <motion.div
-                                  initial={{ opacity: 0, height: 0 }}
-                                  animate={{ opacity: 1, height: "auto" }}
-                                  exit={{ opacity: 0, height: 0 }}
-                                >
-                                  <ThreadReplies threadId={thread.id} currentUserId={user?.id || null} />
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
+          {threads.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+              <MessageCircle className="w-12 h-12 mb-4 opacity-30" />
+              <p className="font-medium">Aucun commentaire</p>
+              <p className="text-sm mt-1">Soyez le premier à commenter</p>
+            </div>
+          ) : (
+            <AnimatePresence mode="popLayout">
+              {threads.map((thread, index) => (
+                <motion.article
+                  key={thread.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ delay: index * 0.03 }}
+                  className="border-b border-border hover:bg-accent/5 transition-colors"
+                >
+                  <div className="p-4">
+                    <div className="flex gap-3">
+                      {/* Avatar */}
+                      <Avatar className="h-10 w-10 flex-shrink-0">
+                        <AvatarImage src={thread.profiles?.avatar_url || undefined} />
+                        <AvatarFallback className="bg-gradient-to-br from-primary to-purple-600 text-white text-sm">
+                          {thread.profiles?.username?.[0]?.toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        {/* Header */}
+                        <div className="flex items-center gap-1 text-sm">
+                          <span className="font-semibold text-foreground truncate max-w-[120px]">
+                            {thread.profiles?.username || 'Utilisateur'}
+                          </span>
+                          <span className="text-muted-foreground truncate">
+                            @{thread.profiles?.username || 'user'}
+                          </span>
+                          <span className="text-muted-foreground">·</span>
+                          <span className="text-muted-foreground text-xs whitespace-nowrap">
+                            {formatDistanceToNow(new Date(thread.created_at), {
+                              addSuffix: false,
+                              locale: fr,
+                            })}
+                          </span>
+                          <div className="ml-auto flex-shrink-0">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem>Signaler</DropdownMenuItem>
+                                <DropdownMenuItem>Copier le lien</DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
+
+                        {/* Body */}
+                        <p className="text-foreground mt-1 text-[15px] leading-relaxed break-words whitespace-pre-wrap">
+                          {thread.content}
+                        </p>
+
+                        {/* Actions */}
+                        <div className="flex items-center justify-between mt-3 max-w-[400px]">
+                          <button
+                            onClick={() => setExpandedThread(expandedThread === thread.id ? null : thread.id)}
+                            className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors group"
+                          >
+                            <div className="p-2 rounded-full group-hover:bg-primary/10 transition-colors -ml-2">
+                              <MessageCircle className="h-4 w-4" />
+                            </div>
+                            <span className="text-xs">{thread.replyCount || ''}</span>
+                          </button>
+
+                          <button className="flex items-center gap-1 text-muted-foreground hover:text-green-500 transition-colors group">
+                            <div className="p-2 rounded-full group-hover:bg-green-500/10 transition-colors">
+                              <Repeat2 className="h-4 w-4" />
+                            </div>
+                          </button>
+
+                          <button
+                            onClick={() => toggleLike(thread.id)}
+                            className={`flex items-center gap-1 transition-colors group ${
+                              thread.isLiked ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'
+                            }`}
+                          >
+                            <div className="p-2 rounded-full group-hover:bg-red-500/10 transition-colors">
+                              <Heart className={`h-4 w-4 ${thread.isLiked ? 'fill-current' : ''}`} />
+                            </div>
+                            <span className="text-xs">{thread.likeCount || ''}</span>
+                          </button>
+
+                          <button className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors group">
+                            <div className="p-2 rounded-full group-hover:bg-primary/10 transition-colors">
+                              <Bookmark className="h-4 w-4" />
+                            </div>
+                          </button>
+
+                          <button className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors group">
+                            <div className="p-2 rounded-full group-hover:bg-primary/10 transition-colors">
+                              <Share className="h-4 w-4" />
+                            </div>
+                          </button>
+                        </div>
+
+                        {/* Thread Replies */}
+                        <AnimatePresence>
+                          {expandedThread === thread.id && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="overflow-hidden"
+                            >
+                              <ThreadReplies threadId={thread.id} currentUserId={user?.id || null} />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </AnimatePresence>
-            )}
-          </ScrollArea>
+                    </div>
+                  </div>
+                </motion.article>
+              ))}
+            </AnimatePresence>
+          )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 };

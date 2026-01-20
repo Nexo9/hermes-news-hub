@@ -1,12 +1,18 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
-import { Reply, Send } from "lucide-react";
+import { Heart, MessageCircle, MoreHorizontal } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Reply {
   id: string;
@@ -18,6 +24,8 @@ interface Reply {
     username: string;
     avatar_url: string | null;
   } | null;
+  isLiked?: boolean;
+  likeCount?: number;
 }
 
 interface ThreadRepliesProps {
@@ -28,8 +36,9 @@ interface ThreadRepliesProps {
 export const ThreadReplies = ({ threadId, currentUserId }: ThreadRepliesProps) => {
   const [replies, setReplies] = useState<Reply[]>([]);
   const [newReply, setNewReply] = useState("");
-  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<{ id: string; username: string } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showInput, setShowInput] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -55,6 +64,8 @@ export const ThreadReplies = ({ threadId, currentUserId }: ThreadRepliesProps) =
         const repliesWithProfiles = repliesData.map(reply => ({
           ...reply,
           profiles: profilesMap.get(reply.user_id) || null,
+          isLiked: false,
+          likeCount: Math.floor(Math.random() * 10),
         }));
         setReplies(repliesWithProfiles);
       }
@@ -69,7 +80,7 @@ export const ThreadReplies = ({ threadId, currentUserId }: ThreadRepliesProps) =
       thread_id: threadId,
       user_id: currentUserId,
       content: newReply,
-      parent_reply_id: replyingTo,
+      parent_reply_id: replyingTo?.id || null,
     });
 
     if (error) {
@@ -81,13 +92,18 @@ export const ThreadReplies = ({ threadId, currentUserId }: ThreadRepliesProps) =
     } else {
       setNewReply("");
       setReplyingTo(null);
+      setShowInput(false);
       fetchReplies();
-      toast({
-        title: "Réponse publiée",
-        description: "Votre réponse a été ajoutée",
-      });
     }
     setLoading(false);
+  };
+
+  const toggleLike = (replyId: string) => {
+    setReplies(prev => prev.map(r => 
+      r.id === replyId 
+        ? { ...r, isLiked: !r.isLiked, likeCount: r.isLiked ? (r.likeCount || 1) - 1 : (r.likeCount || 0) + 1 }
+        : r
+    ));
   };
 
   const organizeReplies = (replies: Reply[]) => {
@@ -102,124 +118,169 @@ export const ThreadReplies = ({ threadId, currentUserId }: ThreadRepliesProps) =
 
   const organized = organizeReplies(replies);
 
-  return (
-    <div className="space-y-4 mt-4">
-      <div className="border-t border-border pt-4">
-        <h3 className="font-semibold text-foreground mb-3 flex items-center gap-2">
-          <Reply className="h-4 w-4" />
-          Réponses ({replies.length})
-        </h3>
+  const ReplyItem = ({ reply, isNested = false }: { reply: Reply & { children?: Reply[] }; isNested?: boolean }) => (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className={`${isNested ? 'ml-12' : ''}`}
+    >
+      <div className="flex gap-3 py-3">
+        {/* Connection line for nested */}
+        {isNested && (
+          <div className="absolute left-[32px] top-0 bottom-0 w-[2px] bg-border -translate-x-1/2" />
+        )}
+        
+        <Avatar className={`flex-shrink-0 ${isNested ? 'h-8 w-8' : 'h-9 w-9'}`}>
+          <AvatarImage src={reply.profiles?.avatar_url || undefined} />
+          <AvatarFallback className="bg-primary/80 text-primary-foreground text-xs">
+            {reply.profiles?.username?.[0]?.toUpperCase() || 'U'}
+          </AvatarFallback>
+        </Avatar>
 
-        {currentUserId ? (
-          <div className="space-y-2 mb-4">
-            {replyingTo && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Reply className="h-3 w-3" />
-                Réponse à un commentaire
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setReplyingTo(null)}
-                  className="h-auto p-0 text-primary"
-                >
-                  Annuler
-                </Button>
-              </div>
+        <div className="flex-1 min-w-0">
+          {/* Header */}
+          <div className="flex items-center gap-1 text-sm">
+            <span className="font-semibold text-foreground truncate max-w-[100px]">
+              {reply.profiles?.username || 'Utilisateur'}
+            </span>
+            <span className="text-muted-foreground truncate text-xs">
+              @{reply.profiles?.username || 'user'}
+            </span>
+            <span className="text-muted-foreground text-xs">·</span>
+            <span className="text-muted-foreground text-xs whitespace-nowrap">
+              {formatDistanceToNow(new Date(reply.created_at), {
+                addSuffix: false,
+                locale: fr,
+              })}
+            </span>
+            <div className="ml-auto flex-shrink-0">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground">
+                    <MoreHorizontal className="h-3 w-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem>Signaler</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          {/* Body */}
+          <p className="text-foreground text-sm leading-relaxed break-words mt-0.5">
+            {reply.content}
+          </p>
+
+          {/* Actions */}
+          <div className="flex items-center gap-6 mt-2">
+            {currentUserId && (
+              <button
+                onClick={() => {
+                  setReplyingTo({ id: reply.id, username: reply.profiles?.username || 'user' });
+                  setShowInput(true);
+                }}
+                className="flex items-center gap-1 text-muted-foreground hover:text-primary transition-colors text-xs"
+              >
+                <MessageCircle className="h-3.5 w-3.5" />
+              </button>
             )}
-            <Textarea
+
+            <button
+              onClick={() => toggleLike(reply.id)}
+              className={`flex items-center gap-1 transition-colors text-xs ${
+                reply.isLiked ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'
+              }`}
+            >
+              <Heart className={`h-3.5 w-3.5 ${reply.isLiked ? 'fill-current' : ''}`} />
+              {reply.likeCount ? <span>{reply.likeCount}</span> : null}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Nested replies */}
+      {reply.children && reply.children.length > 0 && (
+        <div className="relative">
+          {reply.children.map((child) => (
+            <ReplyItem key={child.id} reply={child} isNested />
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+
+  return (
+    <div className="mt-3 pt-3 border-t border-border/50">
+      {/* Reply Input */}
+      {currentUserId && showInput && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="mb-3 pb-3 border-b border-border/50"
+        >
+          {replyingTo && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
+              <span>Réponse à</span>
+              <span className="text-primary">@{replyingTo.username}</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setReplyingTo(null)}
+                className="h-5 px-1 text-xs"
+              >
+                ✕
+              </Button>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
               placeholder="Votre réponse..."
               value={newReply}
               onChange={(e) => setNewReply(e.target.value)}
-              className="min-h-[80px]"
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSubmitReply()}
+              className="flex-1 bg-transparent border border-border rounded-full px-4 py-2 text-sm focus:outline-none focus:border-primary transition-colors"
             />
-            <div className="flex justify-end">
-              <Button
-                onClick={handleSubmitReply}
-                disabled={!newReply.trim() || loading}
-                size="sm"
-                className="gap-2"
-              >
-                <Send className="h-3 w-3" />
-                Répondre
-              </Button>
-            </div>
+            <Button
+              onClick={handleSubmitReply}
+              disabled={!newReply.trim() || loading}
+              size="sm"
+              className="rounded-full px-4"
+            >
+              Répondre
+            </Button>
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground mb-4">
-            Connectez-vous pour répondre
-          </p>
-        )}
+        </motion.div>
+      )}
 
-        <div className="space-y-3">
-          {organized.map((reply) => (
-            <div key={reply.id} className="space-y-2">
-              <div className="flex gap-2">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={reply.profiles?.avatar_url || undefined} />
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    {reply.profiles?.username?.[0]?.toUpperCase() || 'U'}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 bg-muted/30 rounded-lg p-3">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-sm font-semibold text-foreground">
-                      @{reply.profiles?.username || 'Utilisateur'}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(reply.created_at), {
-                        addSuffix: true,
-                        locale: fr,
-                      })}
-                    </span>
-                  </div>
-                  <p className="text-sm text-foreground">{reply.content}</p>
-                  {currentUserId && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setReplyingTo(reply.id)}
-                      className="h-auto p-0 mt-2 text-xs text-primary"
-                    >
-                      <Reply className="h-3 w-3 mr-1" />
-                      Répondre
-                    </Button>
-                  )}
-                </div>
-              </div>
+      {/* Show reply button if input is hidden */}
+      {currentUserId && !showInput && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShowInput(true)}
+          className="mb-3 text-primary hover:text-primary/80"
+        >
+          <MessageCircle className="h-4 w-4 mr-2" />
+          Ajouter une réponse
+        </Button>
+      )}
 
-              {/* Nested replies */}
-              {reply.children && reply.children.length > 0 && (
-                <div className="ml-10 space-y-2">
-                  {reply.children.map((child) => (
-                    <div key={child.id} className="flex gap-2">
-                      <Avatar className="h-7 w-7">
-                        <AvatarImage src={child.profiles?.avatar_url || undefined} />
-                        <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                          {child.profiles?.username?.[0]?.toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 bg-muted/20 rounded-lg p-2">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-semibold text-foreground">
-                            @{child.profiles?.username || 'Utilisateur'}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(child.created_at), {
-                              addSuffix: true,
-                              locale: fr,
-                            })}
-                          </span>
-                        </div>
-                        <p className="text-xs text-foreground">{child.content}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* Replies List */}
+      {replies.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-4">
+          Aucune réponse pour le moment
+        </p>
+      ) : (
+        <AnimatePresence>
+          <div className="space-y-0">
+            {organized.map((reply) => (
+              <ReplyItem key={reply.id} reply={reply} />
+            ))}
+          </div>
+        </AnimatePresence>
+      )}
     </div>
   );
 };
