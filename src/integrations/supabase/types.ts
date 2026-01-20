@@ -648,6 +648,18 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_conversation_participant: {
+        Args: { conv_id: string; user_id: string }
+        Returns: boolean
+      }
+      is_group_admin: {
+        Args: { grp_id: string; usr_id: string }
+        Returns: boolean
+      }
+      is_group_member: {
+        Args: { grp_id: string; usr_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
