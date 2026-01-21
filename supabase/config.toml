@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.antik-ia-chat]
 verify_jwt = false
+
+[functions.fetch-news-rss]
+verify_jwt = false
