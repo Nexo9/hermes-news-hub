@@ -6,6 +6,7 @@ import { FilterBar } from "@/components/FilterBar";
 import { ThreadSection } from "@/components/ThreadSection";
 import { FriendsList } from "@/components/FriendsList";
 import { GroupsList } from "@/components/GroupsList";
+import { NewsRefreshTimer } from "@/components/NewsRefreshTimer";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
@@ -330,7 +331,13 @@ const Index = () => {
         <div className="flex gap-8">
           {/* News Feed */}
           <div className="flex-1">
-            {/* Filters */}
+            {/* Refresh Timer & Filters */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <NewsRefreshTimer onRefresh={() => {
+                setPage(0);
+                fetchNews(0, true);
+              }} />
+            </div>
             <FilterBar onFilterChange={handleFilterChange} />
 
             {isLoading ? (
