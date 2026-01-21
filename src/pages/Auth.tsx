@@ -5,14 +5,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Mail, Lock, User, Crown } from "lucide-react";
+import { Sparkles, Mail, Lock, Crown, ArrowLeft } from "lucide-react";
+import OnboardingForm from "@/components/auth/OnboardingForm";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [username, setUsername] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -41,68 +43,26 @@ const Auth = () => {
     }
   };
 
-  const handleAuth = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      if (isSignUp) {
-        if (!username || username.length < 3) {
-          toast({
-            title: "Erreur",
-            description: "Le pseudo doit contenir au moins 3 caractères",
-            variant: "destructive",
-          });
-          setIsLoading(false);
-          return;
-        }
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-            data: {
-              username: username,
-            },
-          },
-        });
+      if (error) throw error;
 
-        if (error) throw error;
-
-        // Send welcome email
-        if (data.user) {
-          await sendWelcomeEmail(email, username);
-        }
-
-        toast({
-          title: "Compte créé ! 🎉",
-          description: "Bienvenue sur HERMÈS ! Vérifiez votre email.",
-        });
-        
-        // Auto login after signup (if email confirmation is disabled)
-        if (data.session) {
-          navigate("/");
-        }
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
-
-        toast({
-          title: "Connexion réussie",
-          description: "Bienvenue sur HERMÈS",
-        });
-        navigate("/");
-      }
+      toast({
+        title: "Connexion réussie",
+        description: "Bienvenue sur HERMÈS",
+      });
+      navigate("/");
     } catch (error: any) {
       let errorMessage = error.message || "Une erreur est survenue";
-      if (error.message?.includes("User already registered")) {
-        errorMessage = "Un compte existe déjà avec cet email";
-      } else if (error.message?.includes("Invalid login credentials")) {
+      if (error.message?.includes("Invalid login credentials")) {
         errorMessage = "Email ou mot de passe incorrect";
       }
       
@@ -115,6 +75,144 @@ const Auth = () => {
       setIsLoading(false);
     }
   };
+
+  const handleStartSignUp = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validate email
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast({
+        title: "Erreur",
+        description: "Veuillez entrer une adresse email valide",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate password
+    if (!password || password.length < 6) {
+      toast({
+        title: "Erreur",
+        description: "Le mot de passe doit contenir au moins 6 caractères",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate password confirmation
+    if (password !== confirmPassword) {
+      toast({
+        title: "Erreur",
+        description: "Les mots de passe ne correspondent pas",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setShowOnboarding(true);
+  };
+
+  const handleOnboardingComplete = async (data: {
+    username: string;
+    birthDate: Date | undefined;
+    status: string;
+    workSector: string;
+    interests: string[];
+  }) => {
+    setIsLoading(true);
+
+    try {
+      const { data: authData, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            username: data.username,
+          },
+        },
+      });
+
+      if (error) throw error;
+
+      // Update profile with onboarding data
+      if (authData.user) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            username: data.username,
+            birth_date: data.birthDate?.toISOString().split('T')[0],
+            status: data.status,
+            work_sector: data.workSector,
+            interests: data.interests,
+            onboarding_completed: true,
+          })
+          .eq("id", authData.user.id);
+
+        if (profileError) {
+          console.error("Profile update error:", profileError);
+        }
+
+        // Send welcome email
+        await sendWelcomeEmail(email, data.username);
+      }
+
+      toast({
+        title: "Compte créé ! 🎉",
+        description: "Bienvenue sur HERMÈS ! Vérifiez votre email.",
+      });
+      
+      // Auto login after signup (if email confirmation is disabled)
+      if (authData.session) {
+        navigate("/");
+      }
+    } catch (error: any) {
+      let errorMessage = error.message || "Une erreur est survenue";
+      if (error.message?.includes("User already registered")) {
+        errorMessage = "Un compte existe déjà avec cet email";
+      }
+      
+      toast({
+        title: "Erreur",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Onboarding view
+  if (showOnboarding) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg p-6 sm:p-8 bg-card border-border shadow-glow">
+          {/* Header with back button */}
+          <div className="flex items-center mb-6">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowOnboarding(false)}
+              className="mr-2"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+                <Sparkles className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-bold text-foreground">HERMÈS</span>
+            </div>
+          </div>
+
+          <OnboardingForm 
+            onComplete={handleOnboardingComplete} 
+            isLoading={isLoading} 
+          />
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -129,27 +227,7 @@ const Auth = () => {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleAuth} className="space-y-4">
-          {isSignUp && (
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">Pseudo</label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="votre_pseudo"
-                  className="pl-10 bg-background border-border"
-                  required={isSignUp}
-                  minLength={3}
-                  maxLength={30}
-                  pattern="[a-zA-Z0-9_]+"
-                />
-              </div>
-            </div>
-          )}
-
+        <form onSubmit={isSignUp ? handleStartSignUp : handleLogin} className="space-y-4">
           <div className="space-y-2">
             <label className="text-sm font-medium text-foreground">Email</label>
             <div className="relative">
@@ -181,12 +259,30 @@ const Auth = () => {
             </div>
           </div>
 
+          {isSignUp && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Confirmer le mot de passe</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="pl-10 bg-background border-border"
+                  required
+                  minLength={6}
+                />
+              </div>
+            </div>
+          )}
+
           <Button
             type="submit"
             disabled={isLoading}
             className="w-full bg-primary hover:bg-primary/90 h-11"
           >
-            {isLoading ? "Chargement..." : isSignUp ? "Créer un compte" : "Se connecter"}
+            {isLoading ? "Chargement..." : isSignUp ? "Continuer" : "Se connecter"}
           </Button>
         </form>
 
@@ -194,7 +290,10 @@ const Auth = () => {
         <div className="mt-6 text-center">
           <button
             type="button"
-            onClick={() => setIsSignUp(!isSignUp)}
+            onClick={() => {
+              setIsSignUp(!isSignUp);
+              setConfirmPassword("");
+            }}
             className="text-sm text-muted-foreground hover:text-primary transition-colors"
           >
             {isSignUp ? "Déjà un compte ? Se connecter" : "Pas de compte ? S'inscrire"}
