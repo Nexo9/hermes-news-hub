@@ -368,28 +368,43 @@ export type Database = {
           avatar_url: string | null
           banner_url: string | null
           bio: string | null
+          birth_date: string | null
           created_at: string
           id: string
+          interests: string[] | null
+          onboarding_completed: boolean | null
+          status: string | null
           updated_at: string
           username: string
+          work_sector: string | null
         }
         Insert: {
           avatar_url?: string | null
           banner_url?: string | null
           bio?: string | null
+          birth_date?: string | null
           created_at?: string
           id: string
+          interests?: string[] | null
+          onboarding_completed?: boolean | null
+          status?: string | null
           updated_at?: string
           username: string
+          work_sector?: string | null
         }
         Update: {
           avatar_url?: string | null
           banner_url?: string | null
           bio?: string | null
+          birth_date?: string | null
           created_at?: string
           id?: string
+          interests?: string[] | null
+          onboarding_completed?: boolean | null
+          status?: string | null
           updated_at?: string
           username?: string
+          work_sector?: string | null
         }
         Relationships: []
       }
