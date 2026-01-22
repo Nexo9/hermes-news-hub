@@ -1,34 +1,26 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { 
   ArrowLeft, 
   MessageCircle, 
-  Heart, 
-  Share2, 
-  MoreHorizontal,
-  Send,
   Loader2,
-  TrendingUp,
   Users,
-  Sparkles
+  Sparkles,
+  Filter
 } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
-import { fr } from "date-fns/locale";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { SocialThreadReplies } from "@/components/social/SocialThreadReplies";
+import { CategorySidebar, INTEREST_CATEGORIES } from "@/components/social/CategorySidebar";
+import { SearchBar } from "@/components/social/SearchBar";
+import { TrendingHashtags, extractHashtags } from "@/components/social/TrendingHashtags";
+import { ComposeThread } from "@/components/social/ComposeThread";
+import { ThreadCard } from "@/components/social/ThreadCard";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Profile {
   id: string;
@@ -45,11 +37,14 @@ interface SocialThread {
   likesCount: number;
   repliesCount: number;
   isLiked: boolean;
+  hashtags: string[];
 }
 
 const WhatPeopleSay = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
+  
   const [threads, setThreads] = useState<SocialThread[]>([]);
   const [newThread, setNewThread] = useState("");
   const [user, setUser] = useState<any>(null);
@@ -57,12 +52,17 @@ const WhatPeopleSay = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isPosting, setIsPosting] = useState(false);
   const [expandedThread, setExpandedThread] = useState<string | null>(null);
+  
+  // Filters
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeSearch, setActiveSearch] = useState("");
+  const [feedType, setFeedType] = useState<"recent" | "popular">("recent");
 
   useEffect(() => {
     checkUser();
     fetchThreads();
 
-    // Subscribe to realtime updates
     const channel = supabase
       .channel('social-threads')
       .on(
@@ -98,7 +98,7 @@ const WhatPeopleSay = () => {
       .from("social_threads")
       .select("*")
       .order("created_at", { ascending: false })
-      .limit(50);
+      .limit(100);
 
     if (error) {
       console.error("Error fetching threads:", error);
@@ -112,7 +112,6 @@ const WhatPeopleSay = () => {
       return;
     }
 
-    // Fetch profiles for all threads
     const userIds = [...new Set(threadsData.map(t => t.user_id))];
     const { data: profiles } = await supabase
       .from("profiles")
@@ -121,7 +120,6 @@ const WhatPeopleSay = () => {
 
     const profileMap = new Map(profiles?.map(p => [p.id, p]) || []);
 
-    // Fetch likes counts
     const threadIds = threadsData.map(t => t.id);
     const { data: likesData } = await supabase
       .from("social_thread_likes")
@@ -133,7 +131,6 @@ const WhatPeopleSay = () => {
       likesCountMap.set(like.thread_id, (likesCountMap.get(like.thread_id) || 0) + 1);
     });
 
-    // Fetch replies counts
     const { data: repliesData } = await supabase
       .from("social_thread_replies")
       .select("thread_id")
@@ -144,7 +141,6 @@ const WhatPeopleSay = () => {
       repliesCountMap.set(reply.thread_id, (repliesCountMap.get(reply.thread_id) || 0) + 1);
     });
 
-    // Check if current user liked each thread
     let userLikes: string[] = [];
     const { data: { user: currentUser } } = await supabase.auth.getUser();
     if (currentUser) {
@@ -162,11 +158,62 @@ const WhatPeopleSay = () => {
       likesCount: likesCountMap.get(thread.id) || 0,
       repliesCount: repliesCountMap.get(thread.id) || 0,
       isLiked: userLikes.includes(thread.id),
+      hashtags: extractHashtags(thread.content),
     }));
 
     setThreads(enrichedThreads);
     setIsLoading(false);
   }, []);
+
+  // Calculate trending hashtags
+  const trendingTags = useMemo(() => {
+    const tagCounts = new Map<string, number>();
+    threads.forEach(thread => {
+      thread.hashtags.forEach(tag => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      });
+    });
+    return Array.from(tagCounts.entries())
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [threads]);
+
+  // Category counts
+  const categoryCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    INTEREST_CATEGORIES.forEach(cat => {
+      const count = threads.filter(t => t.hashtags.includes(cat.hashtag)).length;
+      counts.set(cat.hashtag, count);
+    });
+    return counts;
+  }, [threads]);
+
+  // Filter threads
+  const filteredThreads = useMemo(() => {
+    let result = [...threads];
+    
+    // Category filter
+    if (selectedCategory) {
+      result = result.filter(t => t.hashtags.includes(selectedCategory));
+    }
+    
+    // Search filter
+    if (activeSearch) {
+      const searchLower = activeSearch.toLowerCase();
+      result = result.filter(t => 
+        t.content.toLowerCase().includes(searchLower) ||
+        t.profile?.username.toLowerCase().includes(searchLower) ||
+        t.hashtags.some(tag => tag.includes(searchLower))
+      );
+    }
+    
+    // Sort
+    if (feedType === "popular") {
+      result.sort((a, b) => (b.likesCount + b.repliesCount) - (a.likesCount + a.repliesCount));
+    }
+    
+    return result;
+  }, [threads, selectedCategory, activeSearch, feedType]);
 
   const handlePostThread = async () => {
     if (!user || !newThread.trim()) return;
@@ -211,7 +258,6 @@ const WhatPeopleSay = () => {
         .insert({ thread_id: threadId, user_id: user.id });
     }
 
-    // Update local state
     setThreads(prev => prev.map(t => 
       t.id === threadId 
         ? { ...t, isLiked: !isLiked, likesCount: isLiked ? t.likesCount - 1 : t.likesCount + 1 }
@@ -239,178 +285,178 @@ const WhatPeopleSay = () => {
     }
   };
 
+  const handleHashtagClick = (tag: string) => {
+    setSelectedCategory(selectedCategory === tag ? null : tag);
+  };
+
+  const handleSearch = () => {
+    setActiveSearch(searchQuery);
+  };
+
+  const SidebarContent = () => (
+    <div className="space-y-4">
+      <TrendingHashtags 
+        trendingTags={trendingTags}
+        selectedTag={selectedCategory}
+        onSelectTag={setSelectedCategory}
+      />
+      <CategorySidebar 
+        selectedCategory={selectedCategory}
+        onSelectCategory={setSelectedCategory}
+        categoryCounts={categoryCounts}
+      />
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-background/95 backdrop-blur-md border-b border-border">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-4">
-          <Button
-            onClick={() => navigate("/")}
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              What are people saying?
-            </h1>
-            <p className="text-sm text-muted-foreground">Liberté d'expression • Discussions ouvertes</p>
+      <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center gap-4 py-3">
+            <Button
+              onClick={() => navigate("/")}
+              variant="ghost"
+              size="icon"
+              className="shrink-0 hover:bg-secondary"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex-1">
+              <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                What are people saying?
+              </h1>
+              <p className="text-sm text-muted-foreground hidden sm:block">
+                Liberté d'expression • Discussions ouvertes
+              </p>
+            </div>
+            
+            {/* Mobile filter button */}
+            {isMobile && (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <Filter className="h-4 w-4" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="right" className="w-[300px] p-4">
+                  <SidebarContent />
+                </SheetContent>
+              </Sheet>
+            )}
+          </div>
+          
+          {/* Search bar */}
+          <div className="pb-3">
+            <SearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              onSearch={handleSearch}
+              placeholder="Rechercher des discussions, #hashtags, utilisateurs..."
+            />
           </div>
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto">
-        {/* Compose Section */}
-        {user ? (
-          <div className="p-4 border-b border-border">
-            <div className="flex gap-3">
-              <Avatar className="h-10 w-10 shrink-0">
-                <AvatarImage src={userProfile?.avatar_url || undefined} />
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  {userProfile?.username?.[0]?.toUpperCase() || "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 space-y-3">
-                <Textarea
-                  placeholder="Qu'avez-vous à dire ?"
+      <div className="max-w-7xl mx-auto px-4 py-4">
+        <div className="flex gap-6">
+          {/* Main Feed */}
+          <div className="flex-1 max-w-2xl">
+            {/* Compose Section */}
+            {user ? (
+              <div className="bg-card rounded-xl border border-border overflow-hidden mb-4">
+                <ComposeThread
+                  userProfile={userProfile}
                   value={newThread}
-                  onChange={(e) => setNewThread(e.target.value)}
-                  className="min-h-24 resize-none border-0 focus-visible:ring-0 p-0 text-lg placeholder:text-muted-foreground/60"
-                  maxLength={500}
+                  onChange={setNewThread}
+                  onSubmit={handlePostThread}
+                  isPosting={isPosting}
                 />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">{newThread.length}/500</span>
-                  <Button 
-                    onClick={handlePostThread} 
-                    disabled={!newThread.trim() || isPosting}
-                    className="gap-2"
+              </div>
+            ) : (
+              <div className="p-6 text-center bg-card rounded-xl border border-border mb-4">
+                <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
+                <p className="text-muted-foreground mb-3">Connectez-vous pour participer aux discussions</p>
+                <Button onClick={() => navigate("/auth")}>Se connecter</Button>
+              </div>
+            )}
+
+            {/* Feed Tabs */}
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
+              <Tabs value={feedType} onValueChange={(v) => setFeedType(v as "recent" | "popular")} className="w-full">
+                <TabsList className="w-full rounded-none border-b border-border bg-transparent h-12">
+                  <TabsTrigger 
+                    value="recent" 
+                    className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
                   >
-                    {isPosting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="h-4 w-4" />
-                    )}
-                    Publier
+                    Récent
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="popular"
+                    className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                  >
+                    Populaire
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+
+              {/* Active filter indicator */}
+              {(selectedCategory || activeSearch) && (
+                <div className="px-4 py-2 bg-primary/10 border-b border-border flex items-center justify-between">
+                  <span className="text-sm text-primary">
+                    {selectedCategory && `#${selectedCategory}`}
+                    {selectedCategory && activeSearch && " • "}
+                    {activeSearch && `"${activeSearch}"`}
+                  </span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => {
+                      setSelectedCategory(null);
+                      setActiveSearch("");
+                      setSearchQuery("");
+                    }}
+                    className="text-xs h-7"
+                  >
+                    Effacer les filtres
                   </Button>
                 </div>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="p-6 text-center border-b border-border bg-muted/30">
-            <Users className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-            <p className="text-muted-foreground mb-3">Connectez-vous pour participer aux discussions</p>
-            <Button onClick={() => navigate("/auth")}>Se connecter</Button>
-          </div>
-        )}
+              )}
 
-        {/* Trending Section */}
-        <div className="px-4 py-3 bg-muted/30 border-b border-border">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <TrendingUp className="h-4 w-4" />
-            <span>Discussions récentes</span>
-          </div>
-        </div>
-
-        {/* Threads List */}
-        <div className="divide-y divide-border">
-          {isLoading ? (
-            <div className="p-8 flex justify-center">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : threads.length === 0 ? (
-            <div className="p-12 text-center">
-              <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="font-semibold text-lg mb-2">Aucune discussion</h3>
-              <p className="text-muted-foreground">Soyez le premier à lancer la conversation !</p>
-            </div>
-          ) : (
-            <AnimatePresence>
-              {threads.map((thread, index) => (
-                <motion.div
-                  key={thread.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <article className="p-4 hover:bg-muted/30 transition-colors">
-                    <div className="flex gap-3">
-                      <Avatar 
-                        className="h-10 w-10 shrink-0 cursor-pointer"
-                        onClick={() => thread.profile && navigate(`/profile/${thread.profile.username}`)}
-                      >
-                        <AvatarImage src={thread.profile?.avatar_url || undefined} />
-                        <AvatarFallback className="bg-primary/10 text-primary">
-                          {thread.profile?.username?.[0]?.toUpperCase() || "?"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span 
-                            className="font-semibold hover:underline cursor-pointer"
-                            onClick={() => thread.profile && navigate(`/profile/${thread.profile.username}`)}
-                          >
-                            @{thread.profile?.username || "anonyme"}
-                          </span>
-                          <span className="text-muted-foreground text-sm">·</span>
-                          <span className="text-muted-foreground text-sm">
-                            {formatDistanceToNow(new Date(thread.created_at), { addSuffix: true, locale: fr })}
-                          </span>
-                          {user?.id === thread.user_id && (
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem 
-                                  onClick={() => handleDelete(thread.id)}
-                                  className="text-destructive"
-                                >
-                                  Supprimer
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          )}
-                        </div>
-                        <p className="mt-1 text-foreground whitespace-pre-wrap break-words">
-                          {thread.content}
-                        </p>
+              {/* Threads List */}
+              <div className="divide-y divide-border/50">
+                {isLoading ? (
+                  <div className="p-12 flex justify-center">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : filteredThreads.length === 0 ? (
+                  <div className="p-12 text-center">
+                    <MessageCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                    <h3 className="font-semibold text-lg mb-2">
+                      {selectedCategory || activeSearch ? "Aucun résultat" : "Aucune discussion"}
+                    </h3>
+                    <p className="text-muted-foreground">
+                      {selectedCategory || activeSearch 
+                        ? "Essayez avec d'autres filtres ou termes de recherche"
+                        : "Soyez le premier à lancer la conversation !"}
+                    </p>
+                  </div>
+                ) : (
+                  <AnimatePresence mode="popLayout">
+                    {filteredThreads.map((thread, index) => (
+                      <div key={thread.id}>
+                        <ThreadCard
+                          thread={thread}
+                          currentUserId={user?.id || null}
+                          isExpanded={expandedThread === thread.id}
+                          onToggleExpand={() => setExpandedThread(expandedThread === thread.id ? null : thread.id)}
+                          onLike={() => handleLike(thread.id, thread.isLiked)}
+                          onDelete={() => handleDelete(thread.id)}
+                          onHashtagClick={handleHashtagClick}
+                          index={index}
+                        />
                         
-                        {/* Actions */}
-                        <div className="flex items-center gap-6 mt-3">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-2 text-muted-foreground hover:text-primary"
-                            onClick={() => setExpandedThread(expandedThread === thread.id ? null : thread.id)}
-                          >
-                            <MessageCircle className="h-4 w-4" />
-                            <span>{thread.repliesCount}</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className={`gap-2 ${thread.isLiked ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'}`}
-                            onClick={() => handleLike(thread.id, thread.isLiked)}
-                          >
-                            <Heart className={`h-4 w-4 ${thread.isLiked ? 'fill-current' : ''}`} />
-                            <span>{thread.likesCount}</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-2 text-muted-foreground hover:text-primary"
-                          >
-                            <Share2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-
                         {/* Replies Section */}
                         <AnimatePresence>
                           {expandedThread === thread.id && (
@@ -418,7 +464,7 @@ const WhatPeopleSay = () => {
                               initial={{ opacity: 0, height: 0 }}
                               animate={{ opacity: 1, height: "auto" }}
                               exit={{ opacity: 0, height: 0 }}
-                              className="mt-4 border-t border-border pt-4"
+                              className="px-4 pb-4 bg-secondary/20 border-b border-border"
                             >
                               <SocialThreadReplies 
                                 threadId={thread.id} 
@@ -435,11 +481,18 @@ const WhatPeopleSay = () => {
                           )}
                         </AnimatePresence>
                       </div>
-                    </div>
-                  </article>
-                </motion.div>
-              ))}
-            </AnimatePresence>
+                    ))}
+                  </AnimatePresence>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Sidebar - Desktop only */}
+          {!isMobile && (
+            <div className="w-80 shrink-0 space-y-4 sticky top-24 h-fit">
+              <SidebarContent />
+            </div>
           )}
         </div>
       </div>
