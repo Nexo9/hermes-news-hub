@@ -10,7 +10,7 @@ import { NewsRefreshTimer } from "@/components/NewsRefreshTimer";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText, Crown, Gamepad2 } from "lucide-react";
+import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText, Crown, Gamepad2, MessagesSquare } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,6 +29,30 @@ interface News {
   source_urls: string[];
 }
 
+// Mapping d'intérêts vers catégories de news
+const INTEREST_TO_CATEGORY: Record<string, string[]> = {
+  politique: ["Politique", "International"],
+  economie: ["Économie", "Business"],
+  technologie: ["Technologie", "Tech", "Innovation"],
+  science: ["Science", "Sciences", "Recherche"],
+  sante: ["Santé", "Médecine"],
+  sport: ["Sport", "Sports"],
+  culture: ["Culture", "Art", "Arts"],
+  musique: ["Musique", "Culture"],
+  cinema: ["Cinéma", "Divertissement", "Culture"],
+  litterature: ["Littérature", "Livres", "Culture"],
+  jeux_video: ["Jeux Vidéo", "Gaming", "Technologie"],
+  voyage: ["Voyage", "Tourisme"],
+  gastronomie: ["Gastronomie", "Cuisine"],
+  mode: ["Mode", "Lifestyle"],
+  environnement: ["Environnement", "Climat", "Écologie"],
+  education: ["Éducation", "Enseignement"],
+  automobile: ["Automobile", "Transport"],
+  immobilier: ["Immobilier", "Économie"],
+  crypto: ["Crypto", "Finance", "Technologie"],
+  ia: ["IA", "Intelligence Artificielle", "Technologie"],
+};
+
 const Index = () => {
   const navigate = useNavigate();
   const [news, setNews] = useState<News[]>([]);
@@ -39,7 +63,7 @@ const Index = () => {
   const [page, setPage] = useState(0);
   const [selectedNews, setSelectedNews] = useState<{ id: string; title: string } | null>(null);
   const [user, setUser] = useState<any>(null);
-  const [profile, setProfile] = useState<{ username: string; avatar_url: string | null } | null>(null);
+  const [profile, setProfile] = useState<{ username: string; avatar_url: string | null; interests: string[] | null } | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [filters, setFilters] = useState({ category: "Toutes", location: "Toutes", search: "", timeFilter: "all" });
   const { toast } = useToast();
@@ -59,7 +83,7 @@ const Index = () => {
     if (data.user) {
       const { data: profileData } = await supabase
         .from("profiles")
-        .select("username, avatar_url")
+        .select("username, avatar_url, interests")
         .eq("id", data.user.id)
         .single();
       
@@ -142,22 +166,25 @@ const Index = () => {
     };
   }, [hasMore, isLoadingMore, isLoading, page, fetchNews]);
 
-  // Apply filters to news
+  // Apply filters to news (with personalization based on interests)
   useEffect(() => {
     applyFilters();
-  }, [news, filters]);
+  }, [news, filters, profile?.interests]);
 
   const applyFilters = () => {
     let filtered = [...news];
 
+    // Apply category filter
     if (filters.category !== "Toutes") {
       filtered = filtered.filter((n) => n.category === filters.category);
     }
 
+    // Apply location filter
     if (filters.location !== "Toutes") {
       filtered = filtered.filter((n) => n.location === filters.location);
     }
 
+    // Apply search filter
     if (filters.search) {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(
@@ -166,6 +193,7 @@ const Index = () => {
       );
     }
 
+    // Apply time filter
     if (filters.timeFilter !== "all") {
       const now = new Date();
       filtered = filtered.filter((n) => {
@@ -181,6 +209,28 @@ const Index = () => {
           return diffDays < 30;
         }
         return true;
+      });
+    }
+
+    // Apply personalization based on user interests (sort by relevance)
+    if (profile?.interests && profile.interests.length > 0 && filters.category === "Toutes") {
+      // Get all relevant categories from user interests
+      const relevantCategories = new Set<string>();
+      profile.interests.forEach(interest => {
+        const categories = INTEREST_TO_CATEGORY[interest] || [];
+        categories.forEach(cat => relevantCategories.add(cat.toLowerCase()));
+      });
+
+      // Sort: matching interests first, then by date
+      filtered.sort((a, b) => {
+        const aMatches = relevantCategories.has(a.category.toLowerCase());
+        const bMatches = relevantCategories.has(b.category.toLowerCase());
+        
+        if (aMatches && !bMatches) return -1;
+        if (!aMatches && bMatches) return 1;
+        
+        // Same relevance, sort by date
+        return new Date(b.published_at).getTime() - new Date(a.published_at).getTime();
       });
     }
 
@@ -224,6 +274,15 @@ const Index = () => {
               
               {/* Navigation Links */}
               <nav className="hidden md:flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/discussions')}
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <MessagesSquare className="h-4 w-4 mr-2" />
+                  Discussions
+                </Button>
                 <Button
                   variant="ghost"
                   size="sm"
