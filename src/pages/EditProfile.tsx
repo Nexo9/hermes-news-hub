@@ -10,6 +10,7 @@ import { ArrowLeft, Upload, Camera, ImageIcon, Loader2, Lock, Shield, LogOut } f
 import { useToast } from "@/hooks/use-toast";
 import { PasswordChangeDialog } from "@/components/PasswordChangeDialog";
 import { Separator } from "@/components/ui/separator";
+import { InterestsEditor } from "@/components/profile/InterestsEditor";
 
 interface Profile {
   id: string;
@@ -17,6 +18,7 @@ interface Profile {
   bio: string | null;
   avatar_url: string | null;
   banner_url: string | null;
+  interests: string[] | null;
 }
 
 const EditProfile = () => {
@@ -26,6 +28,7 @@ const EditProfile = () => {
   const [bio, setBio] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [bannerUrl, setBannerUrl] = useState("");
+  const [interests, setInterests] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingBanner, setUploadingBanner] = useState(false);
@@ -56,6 +59,7 @@ const EditProfile = () => {
       setBio(data.bio || "");
       setAvatarUrl(data.avatar_url || "");
       setBannerUrl(data.banner_url || "");
+      setInterests(data.interests || []);
     };
 
     fetchProfile();
@@ -274,6 +278,32 @@ const EditProfile = () => {
               </Button>
             </div>
           </Card>
+
+          {/* Interests Card */}
+          <InterestsEditor 
+            interests={interests}
+            onSave={async (newInterests) => {
+              if (!profile) return;
+              const { error } = await supabase
+                .from("profiles")
+                .update({ interests: newInterests })
+                .eq("id", profile.id);
+              
+              if (error) {
+                toast({
+                  title: "Erreur",
+                  description: "Impossible de mettre à jour les centres d'intérêt",
+                  variant: "destructive",
+                });
+              } else {
+                setInterests(newInterests);
+                toast({
+                  title: "Centres d'intérêt mis à jour",
+                  description: "Votre fil d'actualités sera personnalisé",
+                });
+              }
+            }}
+          />
 
           {/* Security Card */}
           <Card className="p-6 bg-card border-border">

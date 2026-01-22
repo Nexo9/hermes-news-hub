@@ -15,6 +15,7 @@ import NewsMap from "./pages/NewsMap";
 import TermsOfUse from "./pages/TermsOfUse";
 import Pricing from "./pages/Pricing";
 import MiniGames from "./pages/MiniGames";
+import WhatPeopleSay from "./pages/WhatPeopleSay";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/terms" element={<TermsOfUse />} />
           <Route path="/pricing" element={<Pricing />} />
           <Route path="/games" element={<MiniGames />} />
+          <Route path="/discussions" element={<WhatPeopleSay />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
