@@ -85,6 +85,30 @@ export type Database = {
           },
         ]
       }
+      conversation_presence: {
+        Row: {
+          conversation_id: string
+          id: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          conversation_id: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           created_at: string
@@ -167,6 +191,7 @@ export type Database = {
       }
       groups: {
         Row: {
+          conversation_id: string | null
           created_at: string
           created_by: string
           id: string
@@ -175,6 +200,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          conversation_id?: string | null
           created_at?: string
           created_by: string
           id?: string
@@ -183,6 +209,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          conversation_id?: string | null
           created_at?: string
           created_by?: string
           id?: string
@@ -190,7 +217,15 @@ export type Database = {
           name?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "groups_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       messages: {
         Row: {
@@ -200,6 +235,7 @@ export type Database = {
           id: string
           media_url: string | null
           message_type: string
+          read_at: string | null
           sender_id: string
           updated_at: string
         }
@@ -210,6 +246,7 @@ export type Database = {
           id?: string
           media_url?: string | null
           message_type?: string
+          read_at?: string | null
           sender_id: string
           updated_at?: string
         }
@@ -220,6 +257,7 @@ export type Database = {
           id?: string
           media_url?: string | null
           message_type?: string
+          read_at?: string | null
           sender_id?: string
           updated_at?: string
         }

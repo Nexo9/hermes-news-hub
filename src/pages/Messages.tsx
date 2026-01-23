@@ -1,109 +1,129 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Search, Send, Mic, Image as ImageIcon, StopCircle, Megaphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from "date-fns";
-import { fr } from "date-fns/locale";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { ConversationList } from "@/components/messaging/ConversationList";
+import { ChatView } from "@/components/messaging/ChatView";
+import { EmptyChat } from "@/components/messaging/EmptyChat";
+import { CreateGroupDialog } from "@/components/messaging/CreateGroupDialog";
 import { SystemMessagesPanel } from "@/components/SystemMessagesPanel";
-
-interface Conversation {
-  id: string;
-  updated_at: string;
-  otherUser: {
-    id: string;
-    username: string;
-    avatar_url: string | null;
-  };
-  lastMessage: string | null;
-}
-
-interface Message {
-  id: string;
-  content: string | null;
-  message_type: string;
-  media_url: string | null;
-  created_at: string;
-  sender_id: string;
-  profiles: {
-    username: string;
-    avatar_url: string | null;
-  };
-}
-
-interface Friend {
-  id: string;
-  username: string;
-  avatar_url: string | null;
-}
+import { 
+  Conversation, 
+  Message, 
+  Friend, 
+  Group, 
+  PresenceStatus 
+} from "@/components/messaging/types";
+import { cn } from "@/lib/utils";
 
 const Messages = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [selectedConversation, setSelectedConversation] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState("");
-  const [searchUsername, setSearchUsername] = useState("");
+  const isMobile = useIsMobile();
+
+  // User state
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+
+  // Conversations state
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [friends, setFriends] = useState<Friend[]>([]);
-  const [filteredFriends, setFilteredFriends] = useState<Friend[]>([]);
-  const [showSystemMessages, setShowSystemMessages] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [groups, setGroups] = useState<Group[]>([]);
 
+  // UI state
+  const [showAnnouncements, setShowAnnouncements] = useState(false);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+
+  // Presence state
+  const [presenceStatuses, setPresenceStatuses] = useState<PresenceStatus[]>([]);
+
+  // Recording state
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+
+  // Initialize user
   useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        navigate('/auth');
+        return;
+      }
+      setCurrentUserId(user.id);
+      setLoading(false);
+    };
     checkUser();
-  }, []);
+  }, [navigate]);
 
+  // Fetch data when user is set
   useEffect(() => {
     if (currentUserId) {
       fetchConversations();
       fetchFriends();
+      fetchGroups();
     }
   }, [currentUserId]);
 
+  // Subscribe to conversation updates
   useEffect(() => {
-    if (searchUsername.trim()) {
-      const filtered = friends.filter(f => 
-        f.username.toLowerCase().includes(searchUsername.toLowerCase())
-      );
-      setFilteredFriends(filtered);
-    } else {
-      setFilteredFriends([]);
-    }
-  }, [searchUsername, friends]);
+    if (!currentUserId) return;
 
+    const channel = supabase
+      .channel('conversations-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'messages' },
+        () => {
+          fetchConversations();
+          if (selectedConversation) {
+            fetchMessages(selectedConversation.id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUserId, selectedConversation]);
+
+  // Subscribe to presence updates
   useEffect(() => {
-    if (selectedConversation) {
-      fetchMessages();
-      const unsubscribe = subscribeToMessages();
-      return () => {
-        if (unsubscribe) unsubscribe();
-      };
-    }
-  }, [selectedConversation]);
+    if (!selectedConversation) return;
 
+    const channel = supabase
+      .channel(`presence:${selectedConversation.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversation_presence',
+          filter: `conversation_id=eq.${selectedConversation.id}`,
+        },
+        async () => {
+          await fetchPresence(selectedConversation.id);
+        }
+      )
+      .subscribe();
+
+    fetchPresence(selectedConversation.id);
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedConversation?.id]);
+
+  // Mark messages as read
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
-
-  const checkUser = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate('/auth');
-      return;
+    if (selectedConversation && currentUserId && messages.length > 0) {
+      markMessagesAsRead();
     }
-    setCurrentUserId(user.id);
-    setLoading(false);
-  };
+  }, [selectedConversation, messages, currentUserId]);
 
   const fetchFriends = async () => {
     if (!currentUserId) return;
@@ -126,7 +146,7 @@ const Messages = () => {
       if (mutualIds.length > 0) {
         const { data: profiles } = await supabase
           .from("profiles")
-          .select("id, username, avatar_url")
+          .select("id, username, avatar_url, bio")
           .in("id", mutualIds);
 
         if (profiles) {
@@ -136,12 +156,48 @@ const Messages = () => {
     }
   };
 
+  const fetchGroups = async () => {
+    if (!currentUserId) return;
+
+    const { data: memberships } = await supabase
+      .from("group_members")
+      .select("group_id")
+      .eq("user_id", currentUserId);
+
+    if (memberships && memberships.length > 0) {
+      const groupIds = memberships.map((m) => m.group_id);
+
+      const { data: groupsData } = await supabase
+        .from("groups")
+        .select("id, name, image_url, conversation_id")
+        .in("id", groupIds);
+
+      if (groupsData) {
+        const groupsWithCounts = await Promise.all(
+          groupsData.map(async (group) => {
+            const { count } = await supabase
+              .from("group_members")
+              .select("*", { count: "exact", head: true })
+              .eq("group_id", group.id);
+
+            return {
+              ...group,
+              member_count: count || 0,
+            };
+          })
+        );
+
+        setGroups(groupsWithCounts as Group[]);
+      }
+    }
+  };
+
   const fetchConversations = async () => {
     if (!currentUserId) return;
 
     const { data: participants } = await supabase
       .from('conversation_participants')
-      .select('conversation_id, conversations(updated_at)')
+      .select('conversation_id, conversations(id, updated_at)')
       .eq('user_id', currentUserId);
 
     if (!participants || participants.length === 0) {
@@ -149,46 +205,79 @@ const Messages = () => {
       return;
     }
 
-    const conversationIds = participants.map(p => p.conversation_id);
-    
-    const conversationsWithUsers = await Promise.all(
-      conversationIds.map(async (convId) => {
-        const { data: otherParticipants } = await supabase
+    const conversationIds = participants.map((p) => p.conversation_id);
+
+    // Check which conversations are group conversations
+    const { data: groupConvs } = await supabase
+      .from('groups')
+      .select('conversation_id, name, image_url')
+      .in('conversation_id', conversationIds);
+
+    const groupConvMap = new Map(
+      groupConvs?.map((g) => [g.conversation_id, g]) || []
+    );
+
+    const conversationsWithDetails = await Promise.all(
+      participants.map(async (p) => {
+        const convId = p.conversation_id;
+        const isGroup = groupConvMap.has(convId);
+        const groupInfo = groupConvMap.get(convId);
+
+        // Get participants
+        const { data: allParticipants } = await supabase
           .from('conversation_participants')
           .select('user_id, profiles(id, username, avatar_url)')
-          .eq('conversation_id', convId)
-          .neq('user_id', currentUserId)
-          .limit(1);
+          .eq('conversation_id', convId);
 
+        const participantsList = allParticipants?.map((ap) => ({
+          id: ap.profiles?.id || '',
+          username: ap.profiles?.username || '',
+          avatar_url: ap.profiles?.avatar_url || null,
+        })).filter((p) => p.id) || [];
+
+        // Get last message
         const { data: lastMessage } = await supabase
           .from('messages')
-          .select('content')
+          .select('content, message_type, sender_id, created_at')
           .eq('conversation_id', convId)
           .order('created_at', { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        const participant = participants.find(p => p.conversation_id === convId);
+        // Get unread count
+        const { count: unreadCount } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('conversation_id', convId)
+          .neq('sender_id', currentUserId)
+          .is('read_at', null);
 
         return {
           id: convId,
-          updated_at: participant?.conversations?.updated_at || new Date().toISOString(),
-          otherUser: otherParticipants?.[0]?.profiles || null,
-          lastMessage: lastMessage?.content || null,
-        };
+          updated_at: p.conversations?.updated_at || new Date().toISOString(),
+          type: isGroup ? 'group' : 'direct',
+          name: groupInfo?.name,
+          image_url: groupInfo?.image_url,
+          participants: participantsList,
+          lastMessage,
+          unreadCount: unreadCount || 0,
+        } as Conversation;
       })
     );
 
-    setConversations(conversationsWithUsers.filter(c => c.otherUser));
+    // Sort by updated_at
+    conversationsWithDetails.sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    );
+
+    setConversations(conversationsWithDetails);
   };
 
-  const fetchMessages = async () => {
-    if (!selectedConversation) return;
-
+  const fetchMessages = async (conversationId: string) => {
     const { data } = await supabase
       .from('messages')
       .select('*, profiles(username, avatar_url)')
-      .eq('conversation_id', selectedConversation)
+      .eq('conversation_id', conversationId)
       .order('created_at', { ascending: true });
 
     if (data) {
@@ -196,55 +285,65 @@ const Messages = () => {
     }
   };
 
-  const subscribeToMessages = () => {
-    if (!selectedConversation) return;
+  const fetchPresence = async (conversationId: string) => {
+    const { data } = await supabase
+      .from('conversation_presence')
+      .select('user_id, status')
+      .eq('conversation_id', conversationId);
 
-    const channel = supabase
-      .channel(`messages:${selectedConversation}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversation_id=eq.${selectedConversation}`,
-        },
-        () => fetchMessages()
-      )
-      .subscribe();
+    if (data) {
+      // Get usernames for presence
+      const userIds = data.map((p) => p.user_id);
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, username')
+        .in('id', userIds);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      const presenceWithNames = data.map((p) => ({
+        ...p,
+        username: profiles?.find((pr) => pr.id === p.user_id)?.username,
+      })) as PresenceStatus[];
+
+      setPresenceStatuses(presenceWithNames);
+    }
   };
 
-  const startNewConversation = async (friendId?: string, friendUsername?: string) => {
-    if (!currentUserId) return;
+  const markMessagesAsRead = async () => {
+    if (!selectedConversation || !currentUserId) return;
 
-    const targetId = friendId;
-    const targetUsername = friendUsername || searchUsername;
+    await supabase
+      .from('messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('conversation_id', selectedConversation.id)
+      .neq('sender_id', currentUserId)
+      .is('read_at', null);
+  };
 
-    if (!targetId && !targetUsername) return;
+  const updatePresence = async (status: 'idle' | 'typing' | 'recording') => {
+    if (!selectedConversation || !currentUserId) return;
 
-    let profileId = targetId;
+    await supabase
+      .from('conversation_presence')
+      .upsert({
+        conversation_id: selectedConversation.id,
+        user_id: currentUserId,
+        status,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'conversation_id,user_id' });
+  };
 
-    if (!profileId) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', targetUsername)
-        .maybeSingle();
-
-      if (!profile) {
-        toast({
-          title: "Erreur",
-          description: "Utilisateur introuvable",
-          variant: "destructive",
-        });
-        return;
-      }
-      profileId = profile.id;
+  const handleSelectConversation = async (id: string, type: 'direct' | 'group') => {
+    const conv = conversations.find((c) => c.id === id);
+    if (conv) {
+      setSelectedConversation(conv);
+      await fetchMessages(id);
+      setShowChat(true);
+      setShowAnnouncements(false);
     }
+  };
+
+  const handleNewConversation = async (userId: string) => {
+    if (!currentUserId) return;
 
     // Check if conversation exists
     const { data: existingParticipants } = await supabase
@@ -258,13 +357,11 @@ const Messages = () => {
           .from('conversation_participants')
           .select('user_id')
           .eq('conversation_id', p.conversation_id)
-          .eq('user_id', profileId)
+          .eq('user_id', userId)
           .maybeSingle();
 
         if (otherParticipant) {
-          setSelectedConversation(p.conversation_id);
-          setSearchUsername("");
-          setFilteredFriends([]);
+          await handleSelectConversation(p.conversation_id, 'direct');
           return;
         }
       }
@@ -286,54 +383,32 @@ const Messages = () => {
       return;
     }
 
-    // Add participants
-    const { error: participantsError } = await supabase
+    await supabase
       .from('conversation_participants')
       .insert([
         { conversation_id: newConv.id, user_id: currentUserId },
-        { conversation_id: newConv.id, user_id: profileId },
+        { conversation_id: newConv.id, user_id: userId },
       ]);
 
-    if (participantsError) {
-      toast({
-        title: "Erreur",
-        description: "Impossible d'ajouter les participants",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setSelectedConversation(newConv.id);
-    setSearchUsername("");
-    setFilteredFriends([]);
-    fetchConversations();
+    await fetchConversations();
+    await handleSelectConversation(newConv.id, 'direct');
   };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim() || !selectedConversation || !currentUserId) return;
+  const handleSendMessage = async (content: string) => {
+    if (!selectedConversation || !currentUserId) return;
 
-    const { error } = await supabase.from('messages').insert({
-      conversation_id: selectedConversation,
+    await supabase.from('messages').insert({
+      conversation_id: selectedConversation.id,
       sender_id: currentUserId,
-      content: newMessage,
+      content,
       message_type: 'text',
     });
 
-    if (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible d'envoyer le message",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setNewMessage("");
+    await updatePresence('idle');
   };
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !selectedConversation || !currentUserId) return;
+  const handleSendImage = async (file: File) => {
+    if (!selectedConversation || !currentUserId) return;
 
     const fileExt = file.name.split(".").pop();
     const filePath = `${currentUserId}/${Date.now()}.${fileExt}`;
@@ -345,7 +420,7 @@ const Messages = () => {
     if (uploadError) {
       toast({
         title: "Erreur",
-        description: "Impossible de télécharger le fichier.",
+        description: "Impossible de télécharger l'image.",
         variant: "destructive",
       });
       return;
@@ -355,21 +430,15 @@ const Messages = () => {
       .from("message-media")
       .getPublicUrl(filePath);
 
-    const messageType = file.type.startsWith("image/") ? "image" : "file";
-
     await supabase.from("messages").insert({
-      conversation_id: selectedConversation,
+      conversation_id: selectedConversation.id,
       sender_id: currentUserId,
       media_url: data.publicUrl,
-      message_type: messageType,
+      message_type: "image",
     });
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
   };
 
-  const startRecording = async () => {
+  const handleStartRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const recorder = new MediaRecorder(stream);
@@ -383,8 +452,9 @@ const Messages = () => {
       };
 
       recorder.start();
-      setMediaRecorder(recorder);
+      mediaRecorderRef.current = recorder;
       setIsRecording(true);
+      await updatePresence('recording');
     } catch (error) {
       toast({
         title: "Erreur",
@@ -394,11 +464,12 @@ const Messages = () => {
     }
   };
 
-  const stopRecording = () => {
-    if (mediaRecorder) {
-      mediaRecorder.stop();
+  const handleStopRecording = async () => {
+    if (mediaRecorderRef.current) {
+      mediaRecorderRef.current.stop();
       setIsRecording(false);
-      setMediaRecorder(null);
+      mediaRecorderRef.current = null;
+      await updatePresence('idle');
     }
   };
 
@@ -425,226 +496,110 @@ const Messages = () => {
       .getPublicUrl(filePath);
 
     await supabase.from("messages").insert({
-      conversation_id: selectedConversation,
+      conversation_id: selectedConversation.id,
       sender_id: currentUserId,
       media_url: data.publicUrl,
       message_type: "voice",
     });
   };
 
+  const handleTypingStart = () => updatePresence('typing');
+  const handleTypingStop = () => updatePresence('idle');
+
+  const handleBack = () => {
+    if (showChat) {
+      setShowChat(false);
+      setSelectedConversation(null);
+    } else {
+      navigate('/');
+    }
+  };
+
+  const handleGroupCreated = async (conversationId: string) => {
+    await fetchConversations();
+    await fetchGroups();
+    await handleSelectConversation(conversationId, 'group');
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-primary">Chargement...</div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-primary border-t-transparent" />
+          <span className="text-muted-foreground">Chargement...</span>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="flex h-screen">
-        {/* Conversations List */}
-        <div className="w-80 border-r border-border flex flex-col">
-          <div className="p-4 border-b border-border">
-            <div className="flex items-center gap-2 mb-4">
-              <Button onClick={() => navigate('/')} variant="ghost" size="icon">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <h1 className="text-xl font-bold text-foreground">Messages</h1>
-              <div className="flex-1" />
-              <Button 
-                onClick={() => setShowSystemMessages(!showSystemMessages)} 
-                variant="ghost" 
-                size="icon"
-                className={showSystemMessages ? "bg-primary/20" : ""}
-              >
-                <Megaphone className="h-5 w-5" />
-              </Button>
-            </div>
-            
-            <div className="relative">
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Rechercher un ami..."
-                  value={searchUsername}
-                  onChange={(e) => setSearchUsername(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && startNewConversation()}
-                />
-                <Button onClick={() => startNewConversation()} size="icon">
-                  <Search className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Friends suggestions dropdown */}
-              {filteredFriends.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 border border-border rounded-lg bg-card max-h-48 overflow-y-auto z-10 shadow-lg">
-                  {filteredFriends.map((friend) => (
-                    <div
-                      key={friend.id}
-                      onClick={() => startNewConversation(friend.id, friend.username)}
-                      className="p-3 hover:bg-accent/10 cursor-pointer flex items-center gap-3"
-                    >
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={friend.avatar_url || undefined} />
-                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">
-                          {friend.username[0].toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span className="text-sm font-medium">@{friend.username}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto">
-            {conversations.length === 0 ? (
-              <div className="p-4 text-center text-muted-foreground">
-                <p>Aucune conversation</p>
-                <p className="text-sm mt-1">Recherchez un ami pour démarrer</p>
-              </div>
-            ) : (
-              conversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  onClick={() => setSelectedConversation(conv.id)}
-                  className={`p-4 cursor-pointer hover:bg-accent/5 border-b border-border ${
-                    selectedConversation === conv.id ? 'bg-accent/10' : ''
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <Avatar>
-                      <AvatarImage src={conv.otherUser.avatar_url || undefined} />
-                      <AvatarFallback className="bg-primary text-primary-foreground">
-                        {conv.otherUser.username[0].toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-foreground">@{conv.otherUser.username}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {conv.lastMessage || 'Aucun message'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Chat Area or System Messages */}
-        <div className="flex-1 flex flex-col">
-          {showSystemMessages ? (
-            <div className="flex-1 p-6 overflow-y-auto">
-              <SystemMessagesPanel />
-            </div>
-          ) : selectedConversation ? (
-            <>
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                {messages.map((msg) => {
-                  const isOwn = msg.sender_id === currentUserId;
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className={`flex gap-2 max-w-[70%] ${isOwn ? 'flex-row-reverse' : ''}`}>
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src={msg.profiles?.avatar_url || undefined} />
-                          <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                            {msg.profiles?.username?.[0]?.toUpperCase() || '?'}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div
-                            className={`rounded-2xl px-4 py-2 ${
-                              isOwn
-                                ? 'bg-primary text-primary-foreground'
-                                : 'bg-muted'
-                            }`}
-                          >
-                            {msg.message_type === 'text' && (
-                              <p className="whitespace-pre-wrap">{msg.content}</p>
-                            )}
-                            {msg.message_type === 'image' && msg.media_url && (
-                              <img
-                                src={msg.media_url}
-                                alt="Image"
-                                className="max-w-xs rounded-lg"
-                              />
-                            )}
-                            {msg.message_type === 'voice' && msg.media_url && (
-                              <audio controls src={msg.media_url} className="max-w-xs" />
-                            )}
-                          </div>
-                          <p className={`text-xs text-muted-foreground mt-1 ${isOwn ? 'text-right' : ''}`}>
-                            {formatDistanceToNow(new Date(msg.created_at), {
-                              addSuffix: true,
-                              locale: fr,
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Input Area */}
-              <div className="p-4 border-t border-border">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    accept="image/*"
-                  />
-                  <Button
-                    onClick={() => fileInputRef.current?.click()}
-                    variant="ghost"
-                    size="icon"
-                  >
-                    <ImageIcon className="h-5 w-5" />
-                  </Button>
-                  <Button
-                    onClick={isRecording ? stopRecording : startRecording}
-                    variant="ghost"
-                    size="icon"
-                    className={isRecording ? 'text-destructive' : ''}
-                  >
-                    {isRecording ? (
-                      <StopCircle className="h-5 w-5" />
-                    ) : (
-                      <Mic className="h-5 w-5" />
-                    )}
-                  </Button>
-                  <Input
-                    placeholder="Écrivez un message..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                    className="flex-1"
-                  />
-                  <Button onClick={sendMessage} size="icon">
-                    <Send className="h-5 w-5" />
-                  </Button>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <p className="text-lg">Sélectionnez une conversation</p>
-                <p className="text-sm mt-1">ou recherchez un ami pour commencer</p>
-              </div>
-            </div>
-          )}
-        </div>
+    <div className="h-screen bg-background flex overflow-hidden">
+      {/* Conversation List */}
+      <div
+        className={cn(
+          "w-full md:w-96 shrink-0 transition-transform duration-300",
+          isMobile && showChat && "-translate-x-full absolute"
+        )}
+      >
+        <ConversationList
+          conversations={conversations}
+          groups={groups}
+          friends={friends}
+          selectedId={selectedConversation?.id || null}
+          currentUserId={currentUserId || ''}
+          onSelect={handleSelectConversation}
+          onNewConversation={handleNewConversation}
+          onNewGroup={() => setShowCreateGroup(true)}
+          onBack={() => navigate('/')}
+          onShowAnnouncements={() => {
+            setShowAnnouncements(!showAnnouncements);
+            setShowChat(true);
+            setSelectedConversation(null);
+          }}
+          showAnnouncements={showAnnouncements}
+        />
       </div>
+
+      {/* Chat Area */}
+      <div
+        className={cn(
+          "flex-1 transition-transform duration-300",
+          isMobile && !showChat && "translate-x-full absolute w-full"
+        )}
+      >
+        {showAnnouncements ? (
+          <div className="h-full p-4 overflow-auto">
+            <SystemMessagesPanel />
+          </div>
+        ) : selectedConversation ? (
+          <ChatView
+            conversation={selectedConversation}
+            messages={messages}
+            currentUserId={currentUserId || ''}
+            presenceStatuses={presenceStatuses}
+            isRecording={isRecording}
+            onSendMessage={handleSendMessage}
+            onSendImage={handleSendImage}
+            onStartRecording={handleStartRecording}
+            onStopRecording={handleStopRecording}
+            onTypingStart={handleTypingStart}
+            onTypingStop={handleTypingStop}
+            onBack={handleBack}
+          />
+        ) : (
+          <EmptyChat />
+        )}
+      </div>
+
+      {/* Create Group Dialog */}
+      {currentUserId && (
+        <CreateGroupDialog
+          open={showCreateGroup}
+          onOpenChange={setShowCreateGroup}
+          userId={currentUserId}
+          onGroupCreated={handleGroupCreated}
+        />
+      )}
     </div>
   );
 };
