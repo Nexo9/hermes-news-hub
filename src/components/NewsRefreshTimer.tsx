@@ -5,17 +5,22 @@ import { RefreshCw, Clock, Loader2, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGlobalTimer, REFRESH_INTERVAL } from "@/hooks/useGlobalTimer";
 
 interface NewsRefreshTimerProps {
   onRefresh: () => void;
 }
 
-const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
-
 export function NewsRefreshTimer({ onRefresh }: NewsRefreshTimerProps) {
-  const [timeLeft, setTimeLeft] = useState(REFRESH_INTERVAL_MS);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const { 
+    timeLeft, 
+    lastRefreshTime, 
+    isRefreshing, 
+    setIsRefreshing, 
+    decrementTime, 
+    resetTimer 
+  } = useGlobalTimer();
+  
   const [justRefreshed, setJustRefreshed] = useState(false);
   const { toast } = useToast();
 
@@ -36,8 +41,7 @@ export function NewsRefreshTimer({ onRefresh }: NewsRefreshTimerProps) {
       if (error) throw error;
       
       if (data?.success) {
-        setLastRefresh(new Date());
-        setTimeLeft(REFRESH_INTERVAL_MS);
+        resetTimer();
         setJustRefreshed(true);
         setTimeout(() => setJustRefreshed(false), 3000);
         
@@ -62,24 +66,34 @@ export function NewsRefreshTimer({ onRefresh }: NewsRefreshTimerProps) {
     } finally {
       setIsRefreshing(false);
     }
-  }, [isRefreshing, onRefresh, toast]);
+  }, [isRefreshing, onRefresh, toast, setIsRefreshing, resetTimer]);
+
+  // Initialize timer on mount - calculate remaining time from persisted state
+  useEffect(() => {
+    if (lastRefreshTime) {
+      const elapsed = Date.now() - lastRefreshTime;
+      const remaining = Math.max(0, REFRESH_INTERVAL - elapsed);
+      if (remaining === 0) {
+        // Timer should have triggered, refresh now
+        handleRefresh(false);
+      }
+    }
+  }, []);
 
   // Countdown timer
   useEffect(() => {
     const interval = setInterval(() => {
-      setTimeLeft((prev) => {
-        if (prev <= 1000) {
-          handleRefresh(false);
-          return REFRESH_INTERVAL_MS;
-        }
-        return prev - 1000;
-      });
+      if (timeLeft <= 1000) {
+        handleRefresh(false);
+      } else {
+        decrementTime();
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [handleRefresh]);
+  }, [timeLeft, handleRefresh, decrementTime]);
 
-  const progress = ((REFRESH_INTERVAL_MS - timeLeft) / REFRESH_INTERVAL_MS) * 100;
+  const progress = ((REFRESH_INTERVAL - timeLeft) / REFRESH_INTERVAL) * 100;
 
   return (
     <div className="flex items-center gap-3">
@@ -139,9 +153,9 @@ export function NewsRefreshTimer({ onRefresh }: NewsRefreshTimerProps) {
       </Button>
 
       {/* Last refresh info */}
-      {lastRefresh && (
+      {lastRefreshTime && (
         <span className="text-xs text-muted-foreground hidden md:block">
-          Dernière MAJ: {lastRefresh.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+          Dernière MAJ: {new Date(lastRefreshTime).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
         </span>
       )}
     </div>
