@@ -343,55 +343,118 @@ const Messages = () => {
   };
 
   const handleNewConversation = async (userId: string) => {
-    if (!currentUserId) return;
-
-    // Check if conversation exists
-    const { data: existingParticipants } = await supabase
-      .from('conversation_participants')
-      .select('conversation_id')
-      .eq('user_id', currentUserId);
-
-    if (existingParticipants) {
-      for (const p of existingParticipants) {
-        const { data: otherParticipant } = await supabase
-          .from('conversation_participants')
-          .select('user_id')
-          .eq('conversation_id', p.conversation_id)
-          .eq('user_id', userId)
-          .maybeSingle();
-
-        if (otherParticipant) {
-          await handleSelectConversation(p.conversation_id, 'direct');
-          return;
-        }
-      }
-    }
-
-    // Create new conversation
-    const { data: newConv, error: convError } = await supabase
-      .from('conversations')
-      .insert({})
-      .select()
-      .single();
-
-    if (convError || !newConv) {
+    if (!currentUserId) {
       toast({
         title: "Erreur",
-        description: "Impossible de créer la conversation",
+        description: "Vous devez être connecté pour créer une conversation",
         variant: "destructive",
       });
       return;
     }
 
-    await supabase
-      .from('conversation_participants')
-      .insert([
-        { conversation_id: newConv.id, user_id: currentUserId },
-        { conversation_id: newConv.id, user_id: userId },
-      ]);
+    try {
+      // Check if direct conversation already exists between these two users
+      const { data: myParticipations } = await supabase
+        .from('conversation_participants')
+        .select('conversation_id')
+        .eq('user_id', currentUserId);
 
-    await fetchConversations();
-    await handleSelectConversation(newConv.id, 'direct');
+      if (myParticipations && myParticipations.length > 0) {
+        const myConvIds = myParticipations.map((p) => p.conversation_id);
+        
+        // Find conversations where the other user is also a participant
+        const { data: sharedConvs } = await supabase
+          .from('conversation_participants')
+          .select('conversation_id')
+          .eq('user_id', userId)
+          .in('conversation_id', myConvIds);
+
+        if (sharedConvs && sharedConvs.length > 0) {
+          // Check if any of these are direct (2 participants only, not a group)
+          for (const conv of sharedConvs) {
+            const { count } = await supabase
+              .from('conversation_participants')
+              .select('*', { count: 'exact', head: true })
+              .eq('conversation_id', conv.conversation_id);
+
+            // Also check it's not a group conversation
+            const { data: isGroup } = await supabase
+              .from('groups')
+              .select('id')
+              .eq('conversation_id', conv.conversation_id)
+              .maybeSingle();
+
+            if (count === 2 && !isGroup) {
+              // Found existing direct conversation
+              await handleSelectConversation(conv.conversation_id, 'direct');
+              return;
+            }
+          }
+        }
+      }
+
+      // No existing direct conversation found, create new one
+      const { data: newConv, error: convError } = await supabase
+        .from('conversations')
+        .insert({ created_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .select()
+        .single();
+
+      if (convError) {
+        console.error('Error creating conversation:', convError);
+        toast({
+          title: "Erreur",
+          description: `Impossible de créer la conversation: ${convError.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!newConv) {
+        toast({
+          title: "Erreur",
+          description: "La conversation n'a pas été créée",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Add both participants
+      const { error: participantsError } = await supabase
+        .from('conversation_participants')
+        .insert([
+          { conversation_id: newConv.id, user_id: currentUserId },
+          { conversation_id: newConv.id, user_id: userId },
+        ]);
+
+      if (participantsError) {
+        console.error('Error adding participants:', participantsError);
+        // Try to clean up the conversation
+        await supabase.from('conversations').delete().eq('id', newConv.id);
+        toast({
+          title: "Erreur",
+          description: `Impossible d'ajouter les participants: ${participantsError.message}`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Refresh and select the new conversation
+      await fetchConversations();
+      await handleSelectConversation(newConv.id, 'direct');
+      
+      toast({
+        title: "Succès",
+        description: "Conversation créée avec succès",
+      });
+    } catch (error) {
+      console.error('Unexpected error creating conversation:', error);
+      toast({
+        title: "Erreur",
+        description: "Une erreur inattendue s'est produite",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSendMessage = async (content: string) => {
