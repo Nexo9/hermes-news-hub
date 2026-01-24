@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
-import { NewsCard } from "@/components/NewsCard";
+import { NewsCardEnhanced } from "@/components/NewsCardEnhanced";
 import { FilterBar } from "@/components/FilterBar";
-import { ThreadSection } from "@/components/ThreadSection";
+import { ThreadSectionEnhanced } from "@/components/ThreadSectionEnhanced";
 import { FriendsList } from "@/components/FriendsList";
 import { GroupsList } from "@/components/GroupsList";
 import { NewsRefreshTimer } from "@/components/NewsRefreshTimer";
@@ -27,6 +27,7 @@ interface News {
   location: string;
   published_at: string;
   source_urls: string[];
+  image_url?: string;
 }
 
 // Mapping d'intérêts vers catégories de news
@@ -418,7 +419,7 @@ const Index = () => {
                       className="animate-fade-in"
                       style={{ animationDelay: `${Math.min(index, 10) * 0.05}s` }}
                     >
-                      <NewsCard
+                    <NewsCardEnhanced
                         id={item.id}
                         title={item.title}
                         summary={item.summary}
@@ -426,6 +427,7 @@ const Index = () => {
                         location={item.location}
                         publishedAt={item.published_at}
                         sourceUrls={item.source_urls}
+                        imageUrl={item.image_url}
                         userId={user?.id}
                         onViewThreads={(id) => setSelectedNews({ id, title: item.title })}
                       />
@@ -472,7 +474,7 @@ const Index = () => {
       </main>
 
       {/* Thread Dialog */}
-      <ThreadSection
+      <ThreadSectionEnhanced
         newsId={selectedNews?.id || null}
         newsTitle={selectedNews?.title || ""}
         isOpen={!!selectedNews}
