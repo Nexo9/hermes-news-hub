@@ -167,22 +167,35 @@ const Index = () => {
     };
   }, [hasMore, isLoadingMore, isLoading, page, fetchNews]);
 
-  // Apply filters to news (with personalization based on interests)
+  // Apply filters to news (with personalization based on interests) + deduplication
   useEffect(() => {
     applyFilters();
   }, [news, filters, profile?.interests]);
 
   const applyFilters = () => {
-    let filtered = [...news];
+    // First, deduplicate news by title (case-insensitive, trim whitespace)
+    const seenTitles = new Set<string>();
+    let filtered = news.filter((n) => {
+      const normalizedTitle = n.title.toLowerCase().trim();
+      if (seenTitles.has(normalizedTitle)) {
+        return false;
+      }
+      seenTitles.add(normalizedTitle);
+      return true;
+    });
 
     // Apply category filter
     if (filters.category !== "Toutes") {
-      filtered = filtered.filter((n) => n.category === filters.category);
+      filtered = filtered.filter((n) => 
+        n.category.toLowerCase() === filters.category.toLowerCase()
+      );
     }
 
     // Apply location filter
     if (filters.location !== "Toutes") {
-      filtered = filtered.filter((n) => n.location === filters.location);
+      filtered = filtered.filter((n) => 
+        n.location.toLowerCase().includes(filters.location.toLowerCase())
+      );
     }
 
     // Apply search filter
@@ -190,7 +203,10 @@ const Index = () => {
       const searchLower = filters.search.toLowerCase();
       filtered = filtered.filter(
         (n) =>
-          n.title.toLowerCase().includes(searchLower) || n.summary.toLowerCase().includes(searchLower)
+          n.title.toLowerCase().includes(searchLower) || 
+          n.summary.toLowerCase().includes(searchLower) ||
+          n.category.toLowerCase().includes(searchLower) ||
+          n.location.toLowerCase().includes(searchLower)
       );
     }
 

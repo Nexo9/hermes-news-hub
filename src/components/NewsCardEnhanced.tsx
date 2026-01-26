@@ -149,23 +149,81 @@ export const NewsCardEnhanced = ({
     setShowSources(!showSources);
   };
 
-  // Generate a placeholder image based on category
-  const getPlaceholderImage = () => {
+  // Generate a contextual image based on title keywords and category
+  const getContextualImage = () => {
+    const titleLower = title.toLowerCase();
+    
+    // Keyword-based image mapping for contextual relevance
+    const keywordImages: Array<{ keywords: string[], image: string }> = [
+      // Politics & Government
+      { keywords: ['trump', 'biden', 'états-unis', 'usa', 'amérique', 'washington'], image: 'https://images.unsplash.com/photo-1501466044931-62695aada8e9?w=400&h=200&fit=crop' },
+      { keywords: ['macron', 'france', 'paris', 'élysée', 'assemblée'], image: 'https://images.unsplash.com/photo-1549144511-f099e773c147?w=400&h=200&fit=crop' },
+      { keywords: ['ukraine', 'russie', 'poutine', 'zelensky', 'kiev', 'moscou'], image: 'https://images.unsplash.com/photo-1589519160732-576f165b9adb?w=400&h=200&fit=crop' },
+      { keywords: ['europe', 'bruxelles', 'ue', 'union européenne'], image: 'https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=400&h=200&fit=crop' },
+      { keywords: ['guerre', 'conflit', 'militaire', 'armée', 'défense'], image: 'https://images.unsplash.com/photo-1580752300992-559f8e9ce92e?w=400&h=200&fit=crop' },
+      { keywords: ['élection', 'vote', 'scrutin', 'démocratie'], image: 'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?w=400&h=200&fit=crop' },
+      
+      // Economy & Finance
+      { keywords: ['bourse', 'actions', 'marchés', 'wall street'], image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop' },
+      { keywords: ['bitcoin', 'crypto', 'blockchain'], image: 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=400&h=200&fit=crop' },
+      { keywords: ['banque', 'finance', 'économie', 'inflation'], image: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=400&h=200&fit=crop' },
+      
+      // Technology
+      { keywords: ['ia', 'intelligence artificielle', 'chatgpt', 'openai', 'gemini'], image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400&h=200&fit=crop' },
+      { keywords: ['apple', 'iphone', 'mac'], image: 'https://images.unsplash.com/photo-1591337676887-a217a6970a8a?w=400&h=200&fit=crop' },
+      { keywords: ['google', 'android', 'chrome'], image: 'https://images.unsplash.com/photo-1573804633927-bfcbcd909acd?w=400&h=200&fit=crop' },
+      { keywords: ['tesla', 'spacex', 'musk'], image: 'https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=400&h=200&fit=crop' },
+      { keywords: ['cyber', 'hacker', 'sécurité informatique'], image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&h=200&fit=crop' },
+      
+      // Environment & Climate
+      { keywords: ['climat', 'réchauffement', 'environnement', 'cop'], image: 'https://images.unsplash.com/photo-1569163139599-0f4517e36f51?w=400&h=200&fit=crop' },
+      { keywords: ['tempête', 'ouragan', 'météo', 'inondation'], image: 'https://images.unsplash.com/photo-1527482797697-8795b05a13fe?w=400&h=200&fit=crop' },
+      { keywords: ['incendie', 'feu', 'forêt'], image: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=400&h=200&fit=crop' },
+      
+      // Health
+      { keywords: ['covid', 'vaccin', 'pandémie', 'virus'], image: 'https://images.unsplash.com/photo-1584483766114-2cea6facdf57?w=400&h=200&fit=crop' },
+      { keywords: ['hôpital', 'médecin', 'santé', 'médical'], image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400&h=200&fit=crop' },
+      
+      // Sports
+      { keywords: ['football', 'foot', 'psg', 'ligue 1', 'fifa'], image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400&h=200&fit=crop' },
+      { keywords: ['tennis', 'roland garros', 'wimbledon'], image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=400&h=200&fit=crop' },
+      { keywords: ['jo', 'olympique', 'jeux olympiques'], image: 'https://images.unsplash.com/photo-1569517282132-25d22f4573e6?w=400&h=200&fit=crop' },
+      
+      // Culture & Entertainment
+      { keywords: ['cinéma', 'film', 'oscar', 'cannes'], image: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=200&fit=crop' },
+      { keywords: ['musique', 'concert', 'artiste', 'album'], image: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=400&h=200&fit=crop' },
+      
+      // Transportation
+      { keywords: ['avion', 'aérien', 'vol', 'aéroport'], image: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400&h=200&fit=crop' },
+      { keywords: ['train', 'sncf', 'rail'], image: 'https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=400&h=200&fit=crop' },
+    ];
+    
+    // Check title for keywords
+    for (const mapping of keywordImages) {
+      if (mapping.keywords.some(kw => titleLower.includes(kw))) {
+        return mapping.image;
+      }
+    }
+    
+    // Fallback to category-based images
     const categoryImages: Record<string, string> = {
       'politique': 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=400&h=200&fit=crop',
       'économie': 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop',
       'technologie': 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=200&fit=crop',
-      'sport': 'https://images.unsplash.com/photo-1461896836934- voices?w=400&h=200&fit=crop',
+      'sport': 'https://images.unsplash.com/photo-1461896836934-480b9e29c72f?w=400&h=200&fit=crop',
       'culture': 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=400&h=200&fit=crop',
       'science': 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=400&h=200&fit=crop',
       'santé': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&h=200&fit=crop',
       'environnement': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=200&fit=crop',
+      'autre': 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=200&fit=crop',
+      'international': 'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=400&h=200&fit=crop',
     };
+    
     const lowerCategory = category.toLowerCase();
     return categoryImages[lowerCategory] || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=200&fit=crop';
   };
 
-  const displayImage = imageUrl || getPlaceholderImage();
+  const displayImage = imageUrl || getContextualImage();
 
   return (
     <>

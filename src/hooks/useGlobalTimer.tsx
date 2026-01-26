@@ -2,14 +2,12 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 interface GlobalTimerState {
-  timeLeft: number;
-  lastRefreshTime: number | null;
+  lastRefreshTime: number;
   isRefreshing: boolean;
-  setTimeLeft: (time: number) => void;
   setLastRefreshTime: (time: number) => void;
   setIsRefreshing: (value: boolean) => void;
-  decrementTime: () => void;
   resetTimer: () => void;
+  getTimeLeft: () => number;
 }
 
 const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
@@ -17,27 +15,22 @@ const REFRESH_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 export const useGlobalTimer = create<GlobalTimerState>()(
   persist(
     (set, get) => ({
-      timeLeft: REFRESH_INTERVAL_MS,
-      lastRefreshTime: null,
+      lastRefreshTime: Date.now(),
       isRefreshing: false,
-      setTimeLeft: (time) => set({ timeLeft: time }),
       setLastRefreshTime: (time) => set({ lastRefreshTime: time }),
       setIsRefreshing: (value) => set({ isRefreshing: value }),
-      decrementTime: () => {
-        const current = get().timeLeft;
-        if (current > 1000) {
-          set({ timeLeft: current - 1000 });
-        }
-      },
       resetTimer: () => set({ 
-        timeLeft: REFRESH_INTERVAL_MS, 
         lastRefreshTime: Date.now() 
       }),
+      // Calculate time left based on real elapsed time - works even when tab is closed
+      getTimeLeft: () => {
+        const elapsed = Date.now() - get().lastRefreshTime;
+        return Math.max(0, REFRESH_INTERVAL_MS - elapsed);
+      },
     }),
     {
       name: 'hermes-news-timer',
       partialize: (state) => ({ 
-        timeLeft: state.timeLeft, 
         lastRefreshTime: state.lastRefreshTime 
       }),
     }
