@@ -13,14 +13,14 @@ interface NewsRefreshTimerProps {
 
 export function NewsRefreshTimer({ onRefresh }: NewsRefreshTimerProps) {
   const { 
-    timeLeft, 
     lastRefreshTime, 
     isRefreshing, 
     setIsRefreshing, 
-    decrementTime, 
-    resetTimer 
+    resetTimer,
+    getTimeLeft
   } = useGlobalTimer();
   
+  const [timeLeft, setTimeLeft] = useState(getTimeLeft());
   const [justRefreshed, setJustRefreshed] = useState(false);
   const { toast } = useToast();
 
@@ -42,6 +42,7 @@ export function NewsRefreshTimer({ onRefresh }: NewsRefreshTimerProps) {
       
       if (data?.success) {
         resetTimer();
+        setTimeLeft(REFRESH_INTERVAL);
         setJustRefreshed(true);
         setTimeout(() => setJustRefreshed(false), 3000);
         
@@ -68,30 +69,30 @@ export function NewsRefreshTimer({ onRefresh }: NewsRefreshTimerProps) {
     }
   }, [isRefreshing, onRefresh, toast, setIsRefreshing, resetTimer]);
 
-  // Initialize timer on mount - calculate remaining time from persisted state
+  // Initialize and check if timer expired while away
   useEffect(() => {
-    if (lastRefreshTime) {
-      const elapsed = Date.now() - lastRefreshTime;
-      const remaining = Math.max(0, REFRESH_INTERVAL - elapsed);
-      if (remaining === 0) {
-        // Timer should have triggered, refresh now
-        handleRefresh(false);
-      }
+    const initialTimeLeft = getTimeLeft();
+    setTimeLeft(initialTimeLeft);
+    
+    // If timer expired while away, trigger refresh
+    if (initialTimeLeft === 0) {
+      handleRefresh(false);
     }
   }, []);
 
-  // Countdown timer
+  // Real-time countdown - recalculates from actual elapsed time
   useEffect(() => {
     const interval = setInterval(() => {
-      if (timeLeft <= 1000) {
+      const currentTimeLeft = getTimeLeft();
+      setTimeLeft(currentTimeLeft);
+      
+      if (currentTimeLeft <= 0 && !isRefreshing) {
         handleRefresh(false);
-      } else {
-        decrementTime();
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [timeLeft, handleRefresh, decrementTime]);
+  }, [getTimeLeft, handleRefresh, isRefreshing]);
 
   const progress = ((REFRESH_INTERVAL - timeLeft) / REFRESH_INTERVAL) * 100;
 

@@ -13,8 +13,8 @@ interface FilterBarProps {
   }) => void;
 }
 
-const categories = ["Toutes", "Politique", "Économie", "Technologie", "Science", "Culture", "Sport", "Santé"];
-const locations = ["Toutes", "France", "Europe", "Amérique", "Asie", "Afrique", "Océanie", "Monde"];
+const categories = ["Toutes", "Politique", "politique", "Économie", "économie", "Technologie", "technologie", "Science", "science", "Culture", "culture", "Sport", "sport", "Santé", "santé", "Environnement", "environnement", "autre", "International"];
+const locations = ["Toutes", "France", "Europe", "Amérique", "Asie", "Afrique", "Océanie", "Monde", "International"];
 
 export const FilterBar = ({ onFilterChange }: FilterBarProps) => {
   const [category, setCategory] = useState("Toutes");
