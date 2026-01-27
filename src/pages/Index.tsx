@@ -7,10 +7,11 @@ import { ThreadSectionEnhanced } from "@/components/ThreadSectionEnhanced";
 import { FriendsList } from "@/components/FriendsList";
 import { GroupsList } from "@/components/GroupsList";
 import { NewsRefreshTimer } from "@/components/NewsRefreshTimer";
+import { AdvancedSearchModal } from "@/components/AdvancedSearchModal";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText, Crown, Gamepad2, MessagesSquare } from "lucide-react";
+import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText, Crown, Gamepad2, MessagesSquare, Globe } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -407,12 +408,20 @@ const Index = () => {
         <div className="flex gap-8">
           {/* News Feed */}
           <div className="flex-1">
-            {/* Refresh Timer & Filters */}
+            {/* Refresh Timer & Search */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
               <NewsRefreshTimer onRefresh={() => {
                 setPage(0);
                 fetchNews(0, true);
               }} />
+              <AdvancedSearchModal 
+                trigger={
+                  <Button variant="outline" className="gap-2">
+                    <Globe className="w-4 h-4" />
+                    Recherche Multi-Sources
+                  </Button>
+                }
+              />
             </div>
             <FilterBar onFilterChange={handleFilterChange} />
 

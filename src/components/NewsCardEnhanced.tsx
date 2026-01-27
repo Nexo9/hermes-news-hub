@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,15 +10,17 @@ import {
   Bookmark, 
   Share2, 
   ExternalLink,
-  Image as ImageIcon,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  FileText,
+  Bot
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { ShareNewsDialog } from "@/components/ShareNewsDialog";
+import { NewsArticleModal } from "@/components/NewsArticleModal";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface NewsCardEnhancedProps {
@@ -34,6 +36,17 @@ interface NewsCardEnhancedProps {
   onViewThreads: (newsId: string) => void;
   userId?: string | null;
 }
+
+// Generate a unique hash from string for consistent image selection
+const hashString = (str: string): number => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash);
+};
 
 export const NewsCardEnhanced = ({
   title,
@@ -55,6 +68,7 @@ export const NewsCardEnhanced = ({
   const [showShareDialog, setShowShareDialog] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSources, setShowSources] = useState(false);
+  const [showArticleModal, setShowArticleModal] = useState(false);
 
   const timeAgo = formatDistanceToNow(new Date(publishedAt), {
     addSuffix: true,
@@ -149,81 +163,167 @@ export const NewsCardEnhanced = ({
     setShowSources(!showSources);
   };
 
-  // Generate a contextual image based on title keywords and category
-  const getContextualImage = () => {
+  // Generate a unique contextual image based on title, category, and unique ID
+  const getContextualImage = useMemo(() => {
     const titleLower = title.toLowerCase();
+    const titleHash = hashString(id + title);
     
-    // Keyword-based image mapping for contextual relevance
-    const keywordImages: Array<{ keywords: string[], image: string }> = [
-      // Politics & Government
-      { keywords: ['trump', 'biden', 'états-unis', 'usa', 'amérique', 'washington'], image: 'https://images.unsplash.com/photo-1501466044931-62695aada8e9?w=400&h=200&fit=crop' },
-      { keywords: ['macron', 'france', 'paris', 'élysée', 'assemblée'], image: 'https://images.unsplash.com/photo-1549144511-f099e773c147?w=400&h=200&fit=crop' },
-      { keywords: ['ukraine', 'russie', 'poutine', 'zelensky', 'kiev', 'moscou'], image: 'https://images.unsplash.com/photo-1589519160732-576f165b9adb?w=400&h=200&fit=crop' },
-      { keywords: ['europe', 'bruxelles', 'ue', 'union européenne'], image: 'https://images.unsplash.com/photo-1519677100203-a0e668c92439?w=400&h=200&fit=crop' },
-      { keywords: ['guerre', 'conflit', 'militaire', 'armée', 'défense'], image: 'https://images.unsplash.com/photo-1580752300992-559f8e9ce92e?w=400&h=200&fit=crop' },
-      { keywords: ['élection', 'vote', 'scrutin', 'démocratie'], image: 'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?w=400&h=200&fit=crop' },
-      
-      // Economy & Finance
-      { keywords: ['bourse', 'actions', 'marchés', 'wall street'], image: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop' },
-      { keywords: ['bitcoin', 'crypto', 'blockchain'], image: 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=400&h=200&fit=crop' },
-      { keywords: ['banque', 'finance', 'économie', 'inflation'], image: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=400&h=200&fit=crop' },
-      
+    // Extended image pools for each category/keyword with multiple variations
+    const imagePool: Record<string, string[]> = {
+      // Politics
+      'politics': [
+        'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1555848962-6e79363ec58f?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1523995462485-3d171b5c8fa9?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1541872703-74c5e44368f9?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1575540325876-2f5561929f40?w=600&h=400&fit=crop',
+      ],
+      'usa': [
+        'https://images.unsplash.com/photo-1501466044931-62695aada8e9?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1569431059717-d5abdf9e8c38?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1422464804701-7d8356b3a42f?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1508433957232-3107f5fd5995?w=600&h=400&fit=crop',
+      ],
+      'france': [
+        'https://images.unsplash.com/photo-1549144511-f099e773c147?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1471623320832-752e8bbf8413?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1478391679764-b2d8b3cd1e94?w=600&h=400&fit=crop',
+      ],
+      'war': [
+        'https://images.unsplash.com/photo-1580752300992-559f8e9ce92e?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=600&h=400&fit=crop',
+      ],
+      'ukraine': [
+        'https://images.unsplash.com/photo-1589519160732-576f165b9adb?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1561542320-9a18cd340e98?w=600&h=400&fit=crop',
+      ],
+      // Economy
+      'economy': [
+        'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1590283603385-17ffb3a7f29f?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1559526324-593bc073d938?w=600&h=400&fit=crop',
+      ],
+      'crypto': [
+        'https://images.unsplash.com/photo-1518546305927-5a555bb7020d?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1621761191319-c6fb62004040?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1622630998477-20aa696ecb05?w=600&h=400&fit=crop',
+      ],
       // Technology
-      { keywords: ['ia', 'intelligence artificielle', 'chatgpt', 'openai', 'gemini'], image: 'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=400&h=200&fit=crop' },
-      { keywords: ['apple', 'iphone', 'mac'], image: 'https://images.unsplash.com/photo-1591337676887-a217a6970a8a?w=400&h=200&fit=crop' },
-      { keywords: ['google', 'android', 'chrome'], image: 'https://images.unsplash.com/photo-1573804633927-bfcbcd909acd?w=400&h=200&fit=crop' },
-      { keywords: ['tesla', 'spacex', 'musk'], image: 'https://images.unsplash.com/photo-1560958089-b8a1929cea89?w=400&h=200&fit=crop' },
-      { keywords: ['cyber', 'hacker', 'sécurité informatique'], image: 'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400&h=200&fit=crop' },
-      
-      // Environment & Climate
-      { keywords: ['climat', 'réchauffement', 'environnement', 'cop'], image: 'https://images.unsplash.com/photo-1569163139599-0f4517e36f51?w=400&h=200&fit=crop' },
-      { keywords: ['tempête', 'ouragan', 'météo', 'inondation'], image: 'https://images.unsplash.com/photo-1527482797697-8795b05a13fe?w=400&h=200&fit=crop' },
-      { keywords: ['incendie', 'feu', 'forêt'], image: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=400&h=200&fit=crop' },
-      
+      'tech': [
+        'https://images.unsplash.com/photo-1518770660439-4636190af475?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1531297484001-80022131f5a1?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=600&h=400&fit=crop',
+      ],
+      'ai': [
+        'https://images.unsplash.com/photo-1677442136019-21780ecad995?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1676299081847-824916de030a?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1655720828018-edd2daec9349?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1684379871666-7adff75ff0f5?w=600&h=400&fit=crop',
+      ],
+      'apple': [
+        'https://images.unsplash.com/photo-1591337676887-a217a6970a8a?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=600&h=400&fit=crop',
+      ],
+      // Environment
+      'climate': [
+        'https://images.unsplash.com/photo-1569163139599-0f4517e36f51?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=600&h=400&fit=crop',
+      ],
       // Health
-      { keywords: ['covid', 'vaccin', 'pandémie', 'virus'], image: 'https://images.unsplash.com/photo-1584483766114-2cea6facdf57?w=400&h=200&fit=crop' },
-      { keywords: ['hôpital', 'médecin', 'santé', 'médical'], image: 'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400&h=200&fit=crop' },
-      
+      'health': [
+        'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1584982751601-97dcc096659c?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1631815588090-d4bfec5b1ccb?w=600&h=400&fit=crop',
+      ],
       // Sports
-      { keywords: ['football', 'foot', 'psg', 'ligue 1', 'fifa'], image: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=400&h=200&fit=crop' },
-      { keywords: ['tennis', 'roland garros', 'wimbledon'], image: 'https://images.unsplash.com/photo-1554068865-24cecd4e34b8?w=400&h=200&fit=crop' },
-      { keywords: ['jo', 'olympique', 'jeux olympiques'], image: 'https://images.unsplash.com/photo-1569517282132-25d22f4573e6?w=400&h=200&fit=crop' },
-      
-      // Culture & Entertainment
-      { keywords: ['cinéma', 'film', 'oscar', 'cannes'], image: 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=200&fit=crop' },
-      { keywords: ['musique', 'concert', 'artiste', 'album'], image: 'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=400&h=200&fit=crop' },
-      
-      // Transportation
-      { keywords: ['avion', 'aérien', 'vol', 'aéroport'], image: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?w=400&h=200&fit=crop' },
-      { keywords: ['train', 'sncf', 'rail'], image: 'https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=400&h=200&fit=crop' },
+      'sport': [
+        'https://images.unsplash.com/photo-1461896836934-480b9e29c72f?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1574629810360-7efbbe195018?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1517649763962-0c623066013b?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1569517282132-25d22f4573e6?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1552674605-db6ffd4facb5?w=600&h=400&fit=crop',
+      ],
+      // Culture
+      'culture': [
+        'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1514320291840-2e0a9bf2a9ae?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1499364615650-ec38552f4f34?w=600&h=400&fit=crop',
+      ],
+      // Science
+      'science': [
+        'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1532094349884-543bc11b234d?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1614935151651-0bea6508db6b?w=600&h=400&fit=crop',
+      ],
+      // Default / Other
+      'default': [
+        'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1495020689067-958852a7765e?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1586339949216-35c2747cc36d?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=600&h=400&fit=crop',
+        'https://images.unsplash.com/photo-1557672172-298e090bd0f1?w=600&h=400&fit=crop',
+      ],
+    };
+
+    // Keyword detection with priority
+    const keywordMapping: [string[], string][] = [
+      [['trump', 'biden', 'états-unis', 'usa', 'amérique', 'washington', 'maison blanche'], 'usa'],
+      [['macron', 'france', 'paris', 'élysée', 'assemblée', 'français'], 'france'],
+      [['ukraine', 'russie', 'poutine', 'zelensky', 'kiev', 'moscou'], 'ukraine'],
+      [['guerre', 'conflit', 'militaire', 'armée', 'défense', 'otan'], 'war'],
+      [['ia', 'intelligence artificielle', 'chatgpt', 'openai', 'gemini', 'claude'], 'ai'],
+      [['apple', 'iphone', 'mac', 'ipad'], 'apple'],
+      [['bitcoin', 'crypto', 'ethereum', 'blockchain'], 'crypto'],
+      [['climat', 'réchauffement', 'environnement', 'cop', 'écologie'], 'climate'],
+      [['santé', 'médecin', 'hôpital', 'vaccin', 'covid', 'virus'], 'health'],
+      [['football', 'tennis', 'olympique', 'sport', 'jo', 'fifa'], 'sport'],
+      [['cinéma', 'film', 'musique', 'concert', 'art', 'culture'], 'culture'],
+      [['science', 'recherche', 'découverte', 'espace', 'nasa'], 'science'],
+      [['économie', 'bourse', 'finance', 'inflation', 'banque'], 'economy'],
+      [['technologie', 'tech', 'innovation', 'startup', 'numérique'], 'tech'],
     ];
-    
-    // Check title for keywords
-    for (const mapping of keywordImages) {
-      if (mapping.keywords.some(kw => titleLower.includes(kw))) {
-        return mapping.image;
+
+    // Find matching category from keywords
+    let matchedCategory = 'default';
+    for (const [keywords, cat] of keywordMapping) {
+      if (keywords.some(kw => titleLower.includes(kw))) {
+        matchedCategory = cat;
+        break;
       }
     }
-    
-    // Fallback to category-based images
-    const categoryImages: Record<string, string> = {
-      'politique': 'https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?w=400&h=200&fit=crop',
-      'économie': 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?w=400&h=200&fit=crop',
-      'technologie': 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=400&h=200&fit=crop',
-      'sport': 'https://images.unsplash.com/photo-1461896836934-480b9e29c72f?w=400&h=200&fit=crop',
-      'culture': 'https://images.unsplash.com/photo-1507838153414-b4b713384a76?w=400&h=200&fit=crop',
-      'science': 'https://images.unsplash.com/photo-1507413245164-6160d8298b31?w=400&h=200&fit=crop',
-      'santé': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&h=200&fit=crop',
-      'environnement': 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=200&fit=crop',
-      'autre': 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=200&fit=crop',
-      'international': 'https://images.unsplash.com/photo-1526470608268-f674ce90ebd4?w=400&h=200&fit=crop',
-    };
-    
-    const lowerCategory = category.toLowerCase();
-    return categoryImages[lowerCategory] || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=200&fit=crop';
-  };
 
-  const displayImage = imageUrl || getContextualImage();
+    // Fallback to category-based if no keyword match
+    if (matchedCategory === 'default') {
+      const categoryLower = category.toLowerCase();
+      if (categoryLower.includes('politique')) matchedCategory = 'politics';
+      else if (categoryLower.includes('économie')) matchedCategory = 'economy';
+      else if (categoryLower.includes('technologie')) matchedCategory = 'tech';
+      else if (categoryLower.includes('sport')) matchedCategory = 'sport';
+      else if (categoryLower.includes('culture')) matchedCategory = 'culture';
+      else if (categoryLower.includes('science')) matchedCategory = 'science';
+      else if (categoryLower.includes('santé')) matchedCategory = 'health';
+      else if (categoryLower.includes('environnement')) matchedCategory = 'climate';
+    }
+
+    // Get image pool and select based on hash (ensures same news always gets same image)
+    const pool = imagePool[matchedCategory] || imagePool['default'];
+    const imageIndex = titleHash % pool.length;
+    
+    return pool[imageIndex];
+  }, [id, title, category]);
+
+  const displayImage = imageUrl || getContextualImage;
 
   return (
     <>
@@ -365,6 +465,20 @@ export const NewsCardEnhanced = ({
               <Share2 className="w-4 h-4" />
             </Button>
 
+            {/* View Full Article Button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowArticleModal(true);
+              }}
+              className="h-8 px-2 text-muted-foreground hover:text-primary transition-all duration-300 hover:scale-105 gap-1"
+            >
+              <Bot className="w-4 h-4" />
+              <span className="text-xs hidden sm:inline">Article</span>
+            </Button>
+
             <Button
               variant="ghost"
               size="sm"
@@ -383,6 +497,21 @@ export const NewsCardEnhanced = ({
         newsId={id}
         newsTitle={title}
         userId={userId || ""}
+      />
+
+      <NewsArticleModal
+        isOpen={showArticleModal}
+        onClose={() => setShowArticleModal(false)}
+        news={{
+          id,
+          title,
+          summary,
+          category,
+          location,
+          publishedAt,
+          sourceUrls,
+          imageUrl: displayImage
+        }}
       />
     </>
   );
