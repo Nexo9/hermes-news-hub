@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Shield, Cookie, FileText, Heart } from "lucide-react";
 
 const CONSENT_KEY = "hermes_consent_accepted";
@@ -54,201 +54,110 @@ export const ConsentModal = ({ children }: ConsentModalProps) => {
     );
   }
 
-  // Show consent modal
-  if (!hasConsent) {
-    return (
-      <div className="fixed inset-0 z-[100] bg-background">
-        <div className="min-h-screen flex flex-col">
-          {/* Header */}
-          <header className="border-b border-border bg-background/80 backdrop-blur-lg py-6">
-            <div className="container mx-auto px-4 text-center">
-              <div className="flex items-center justify-center gap-3 mb-2">
-                <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <Shield className="w-7 h-7 text-white" />
-                </div>
-                <h1 className="text-3xl font-bold text-foreground">HERMÈS</h1>
+  return (
+    <>
+      {children}
+      
+      <Dialog open={!hasConsent} onOpenChange={() => {}}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden" hideCloseButton>
+          <DialogHeader className="pb-4 border-b border-border">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+                <Shield className="w-5 h-5 text-white" />
               </div>
-              <p className="text-muted-foreground">Bienvenue sur notre plateforme d'information</p>
-            </div>
-          </header>
-
-          {/* Content */}
-          <main className="flex-1 container mx-auto px-4 py-8 max-w-4xl">
-            <div className="bg-card rounded-xl border border-border shadow-lg overflow-hidden">
-              <div className="p-6 bg-muted/50 border-b border-border">
-                <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-primary" />
-                  Conditions Générales d'Utilisation
-                </h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Veuillez lire et accepter nos conditions pour accéder à HERMÈS
-                </p>
-              </div>
-
-              <ScrollArea className="h-[400px] p-6">
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <h3>1. Présentation de la plateforme</h3>
-                  <p>
-                    HERMÈS est une plateforme d'information et de réseau social développée par Ibrahim Mohamed Antik. 
-                    Notre mission est de fournir une information neutre, vérifiée et accessible à tous. 
-                    En utilisant ce service, vous acceptez de respecter les présentes conditions.
-                  </p>
-
-                  <h3>2. Inscription et compte utilisateur</h3>
-                  <p>
-                    L'accès à certaines fonctionnalités nécessite la création d'un compte. Vous vous engagez à :
-                  </p>
-                  <ul>
-                    <li>Fournir des informations exactes et à jour</li>
-                    <li>Maintenir la confidentialité de vos identifiants</li>
-                    <li>Ne pas créer plusieurs comptes</li>
-                    <li>Signaler toute utilisation non autorisée de votre compte</li>
-                  </ul>
-
-                  <h3>3. Règles de conduite</h3>
-                  <p>Sur HERMÈS, vous vous engagez à ne pas :</p>
-                  <ul>
-                    <li>Publier de contenus haineux, discriminatoires ou illégaux</li>
-                    <li>Harceler, menacer ou intimider d'autres utilisateurs</li>
-                    <li>Diffuser de fausses informations de manière intentionnelle</li>
-                    <li>Usurper l'identité d'une autre personne</li>
-                    <li>Utiliser la plateforme à des fins commerciales non autorisées</li>
-                    <li>Tenter de compromettre la sécurité du système</li>
-                  </ul>
-
-                  <h3>4. Contenus et propriété intellectuelle</h3>
-                  <p>
-                    Les articles synthétisés par Antik-IA sont générés à partir de sources publiques et citées. 
-                    Vous conservez les droits sur vos contenus originaux publiés, mais accordez à HERMÈS une 
-                    licence d'utilisation pour leur affichage sur la plateforme.
-                  </p>
-
-                  <h3>5. Modération et sanctions</h3>
-                  <p>
-                    L'équipe HERMÈS se réserve le droit de modérer les contenus et de suspendre ou supprimer 
-                    tout compte en violation des présentes conditions, sans préavis ni indemnité.
-                  </p>
-
-                  <h3>6. Protection des données personnelles</h3>
-                  <p>
-                    Vos données sont collectées et traitées conformément au RGPD. Nous collectons :
-                  </p>
-                  <ul>
-                    <li>Données d'inscription (email, nom d'utilisateur)</li>
-                    <li>Données de profil (avatar, bio, centres d'intérêt)</li>
-                    <li>Données d'utilisation (interactions, préférences)</li>
-                    <li>Cookies techniques et analytiques</li>
-                  </ul>
-                  <p>
-                    Vous disposez d'un droit d'accès, de rectification et de suppression de vos données.
-                  </p>
-
-                  <h3>7. Cookies</h3>
-                  <p>
-                    HERMÈS utilise des cookies pour :
-                  </p>
-                  <ul>
-                    <li><strong>Cookies essentiels :</strong> authentification, sécurité, préférences</li>
-                    <li><strong>Cookies analytiques :</strong> amélioration de l'expérience utilisateur</li>
-                    <li><strong>Cookies de personnalisation :</strong> adaptation du contenu à vos intérêts</li>
-                  </ul>
-
-                  <h3>8. Engagement humanitaire</h3>
-                  <p>
-                    HERMÈS soutient activement les causes humanitaires, notamment en Palestine, au Congo et au Soudan. 
-                    Une partie des revenus générés par les abonnements Premium est reversée à des organisations 
-                    humanitaires reconnues. En utilisant HERMÈS, vous contribuez indirectement à ces causes.
-                  </p>
-
-                  <h3>9. Limitation de responsabilité</h3>
-                  <p>
-                    HERMÈS fournit un service d'agrégation et de synthèse d'informations. Nous nous efforçons 
-                    d'assurer l'exactitude des contenus, mais ne pouvons garantir l'absence d'erreurs. 
-                    Les utilisateurs sont encouragés à consulter les sources originales pour vérification.
-                  </p>
-
-                  <h3>10. Modifications des conditions</h3>
-                  <p>
-                    Ces conditions peuvent être modifiées à tout moment. Les utilisateurs seront informés 
-                    des changements significatifs et devront accepter les nouvelles conditions pour continuer 
-                    à utiliser le service.
-                  </p>
-
-                  <h3>11. Droit applicable</h3>
-                  <p>
-                    Les présentes conditions sont régies par le droit français. Tout litige sera soumis 
-                    aux tribunaux compétents.
-                  </p>
-
-                  <Separator className="my-6" />
-
-                  <p className="text-center text-muted-foreground">
-                    Dernière mise à jour : {new Date().toLocaleDateString('fr-FR')}
-                  </p>
-                </div>
-              </ScrollArea>
-
-              <div className="p-6 bg-muted/30 border-t border-border space-y-4">
-                {/* Checkboxes */}
-                <div className="space-y-3">
-                  <label className="flex items-start gap-3 cursor-pointer group">
-                    <Checkbox 
-                      checked={termsAccepted} 
-                      onCheckedChange={(checked) => setTermsAccepted(checked === true)}
-                      className="mt-0.5"
-                    />
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                      <FileText className="w-4 h-4 inline mr-1 text-primary" />
-                      J'ai lu et j'accepte les <strong>Conditions Générales d'Utilisation</strong> de HERMÈS
-                    </span>
-                  </label>
-
-                  <label className="flex items-start gap-3 cursor-pointer group">
-                    <Checkbox 
-                      checked={cookiesAccepted} 
-                      onCheckedChange={(checked) => setCookiesAccepted(checked === true)}
-                      className="mt-0.5"
-                    />
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                      <Cookie className="w-4 h-4 inline mr-1 text-primary" />
-                      J'accepte l'utilisation des <strong>cookies</strong> nécessaires au fonctionnement du site
-                    </span>
-                  </label>
-
-                  <label className="flex items-start gap-3 cursor-pointer group">
-                    <Checkbox 
-                      checked={privacyAccepted} 
-                      onCheckedChange={(checked) => setPrivacyAccepted(checked === true)}
-                      className="mt-0.5"
-                    />
-                    <span className="text-sm text-muted-foreground group-hover:text-foreground transition-colors">
-                      <Shield className="w-4 h-4 inline mr-1 text-primary" />
-                      J'accepte la <strong>politique de confidentialité</strong> et le traitement de mes données personnelles
-                    </span>
-                  </label>
-                </div>
-
-                {/* Accept Button */}
-                <Button 
-                  onClick={handleAccept} 
-                  disabled={!canAccept}
-                  className="w-full bg-primary hover:bg-primary/90 h-12 text-lg"
-                >
-                  {canAccept ? "Accéder à HERMÈS" : "Veuillez accepter toutes les conditions"}
-                </Button>
-
-                <p className="text-xs text-center text-muted-foreground">
-                  <Heart className="w-3 h-3 inline mr-1 text-destructive" />
-                  En accédant à HERMÈS, vous soutenez nos causes humanitaires
-                </p>
+              <div>
+                <DialogTitle className="text-xl">Bienvenue sur HERMÈS</DialogTitle>
+                <p className="text-sm text-muted-foreground">Veuillez accepter nos conditions pour continuer</p>
               </div>
             </div>
-          </main>
-        </div>
-      </div>
-    );
-  }
+          </DialogHeader>
 
-  // User has consented, show the app
-  return <>{children}</>;
+          <ScrollArea className="h-[300px] pr-4">
+            <div className="prose prose-sm dark:prose-invert max-w-none text-sm">
+              <h4 className="text-base font-semibold">1. Présentation</h4>
+              <p className="text-muted-foreground">
+                HERMÈS est une plateforme d'information développée par Ibrahim Mohamed Antik. 
+                En utilisant ce service, vous acceptez les présentes conditions.
+              </p>
+
+              <h4 className="text-base font-semibold">2. Règles de conduite</h4>
+              <p className="text-muted-foreground">Vous vous engagez à ne pas publier de contenus haineux, discriminatoires ou illégaux, 
+              à ne pas harceler d'autres utilisateurs et à ne pas diffuser de fausses informations.</p>
+
+              <h4 className="text-base font-semibold">3. Protection des données</h4>
+              <p className="text-muted-foreground">
+                Vos données sont collectées conformément au RGPD : email, profil, interactions.
+                Vous disposez d'un droit d'accès, de rectification et de suppression.
+              </p>
+
+              <h4 className="text-base font-semibold">4. Cookies</h4>
+              <p className="text-muted-foreground">
+                HERMÈS utilise des cookies essentiels (authentification, sécurité), 
+                analytiques (amélioration UX) et de personnalisation (contenu adapté).
+              </p>
+
+              <h4 className="text-base font-semibold">5. Engagement humanitaire</h4>
+              <p className="text-muted-foreground">
+                HERMÈS soutient la Palestine, le Congo et le Soudan. 
+                Une partie des revenus est reversée à des organisations humanitaires.
+              </p>
+
+              <h4 className="text-base font-semibold">6. Modération</h4>
+              <p className="text-muted-foreground">
+                L'équipe HERMÈS peut modérer les contenus et suspendre tout compte en violation des conditions.
+              </p>
+            </div>
+          </ScrollArea>
+
+          <div className="pt-4 border-t border-border space-y-3">
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <Checkbox 
+                checked={termsAccepted} 
+                onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+              />
+              <span className="text-sm text-muted-foreground group-hover:text-foreground">
+                <FileText className="w-4 h-4 inline mr-1 text-primary" />
+                J'accepte les <strong>CGU</strong>
+              </span>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <Checkbox 
+                checked={cookiesAccepted} 
+                onCheckedChange={(checked) => setCookiesAccepted(checked === true)}
+              />
+              <span className="text-sm text-muted-foreground group-hover:text-foreground">
+                <Cookie className="w-4 h-4 inline mr-1 text-primary" />
+                J'accepte les <strong>cookies</strong>
+              </span>
+            </label>
+
+            <label className="flex items-center gap-3 cursor-pointer group">
+              <Checkbox 
+                checked={privacyAccepted} 
+                onCheckedChange={(checked) => setPrivacyAccepted(checked === true)}
+              />
+              <span className="text-sm text-muted-foreground group-hover:text-foreground">
+                <Shield className="w-4 h-4 inline mr-1 text-primary" />
+                J'accepte la <strong>politique de confidentialité</strong>
+              </span>
+            </label>
+
+            <Button 
+              onClick={handleAccept} 
+              disabled={!canAccept}
+              className="w-full bg-primary hover:bg-primary/90"
+            >
+              {canAccept ? "Accéder à HERMÈS" : "Acceptez toutes les conditions"}
+            </Button>
+
+            <p className="text-xs text-center text-muted-foreground">
+              <Heart className="w-3 h-3 inline mr-1 text-destructive" />
+              En accédant, vous soutenez nos causes humanitaires
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 };
