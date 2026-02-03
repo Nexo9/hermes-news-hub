@@ -13,7 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Megaphone, Users, Settings, Newspaper, MessageSquare, Trash2, 
   BarChart3, Shield, ArrowLeft, Search, RefreshCw,
-  TrendingUp, Heart, Bookmark, Share2, Calendar, Bot, Palette
+  TrendingUp, Heart, Bookmark, Share2, Calendar, Bot, Palette, Wrench
 } from "lucide-react";
 import {
   AlertDialog,
@@ -30,6 +30,7 @@ import { AntikIAPanel } from "@/components/AntikIAPanel";
 import { AdminUserManagement } from "@/components/AdminUserManagement";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import { SystemMessagesPanel } from "@/components/SystemMessagesPanel";
+import { AdminConfigPanel } from "@/components/admin/AdminConfigPanel";
 
 interface Announcement {
   id: string;
@@ -404,7 +405,7 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs defaultValue="announcements" className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="announcements" className="gap-2">
               <Megaphone className="h-4 w-4" />
               <span className="hidden sm:inline">Annonces</span>
@@ -416,6 +417,10 @@ export default function AdminDashboard() {
             <TabsTrigger value="moderation" className="gap-2">
               <MessageSquare className="h-4 w-4" />
               <span className="hidden sm:inline">Modération</span>
+            </TabsTrigger>
+            <TabsTrigger value="config" className="gap-2">
+              <Wrench className="h-4 w-4" />
+              <span className="hidden sm:inline">Configuration</span>
             </TabsTrigger>
             <TabsTrigger value="antikia" className="gap-2">
               <Bot className="h-4 w-4" />
@@ -647,6 +652,11 @@ export default function AdminDashboard() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Configuration Tab */}
+          <TabsContent value="config">
+            <AdminConfigPanel />
           </TabsContent>
         </Tabs>
       </div>
