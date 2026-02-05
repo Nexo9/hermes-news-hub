@@ -21,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Settings, Plus, Save, Trash2, RefreshCw, Globe, Lock } from "lucide-react";
+import { Settings, Plus, Save, Trash2, RefreshCw, Globe, Lock, Edit } from "lucide-react";
 
 interface PlatformSetting {
   id: string;
@@ -185,16 +185,16 @@ export function PlatformSettingsEditor() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Settings className="h-5 w-5" />
-              Paramètres globaux ({settings.length})
+              <span className="text-base sm:text-lg">Paramètres ({settings.length})</span>
             </CardTitle>
-            <CardDescription>Configurez les paramètres de la plateforme pour tous les utilisateurs</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Configurez les paramètres globaux</CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={fetchSettings}>
+            <Button size="icon" variant="outline" onClick={fetchSettings}>
               <RefreshCw className="h-4 w-4" />
             </Button>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
@@ -276,9 +276,9 @@ export function PlatformSettingsEditor() {
             </Dialog>
           </div>
         </div>
-        <div className="flex gap-2 mt-4">
+        <div className="mt-4">
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="Catégorie" />
             </SelectTrigger>
             <SelectContent>
@@ -291,7 +291,7 @@ export function PlatformSettingsEditor() {
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="h-[300px] sm:h-[400px]">
           <div className="space-y-3">
             {filteredSettings.map((setting) => (
               <div
@@ -320,37 +320,37 @@ export function PlatformSettingsEditor() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold font-mono text-sm">{setting.key}</p>
-                        <Badge>{setting.category}</Badge>
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                        <p className="font-semibold font-mono text-xs sm:text-sm break-all">{setting.key}</p>
+                        <Badge className="text-[10px] sm:text-xs">{setting.category}</Badge>
                         {setting.is_public ? (
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-[10px] sm:text-xs">
                             <Globe className="h-3 w-3 mr-1" />
                             Public
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="text-xs">
+                          <Badge variant="secondary" className="text-[10px] sm:text-xs">
                             <Lock className="h-3 w-3 mr-1" />
                             Privé
                           </Badge>
                         )}
                       </div>
                       {setting.description && (
-                        <p className="text-sm text-muted-foreground mt-1">{setting.description}</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground">{setting.description}</p>
                       )}
-                      <p className="text-sm font-mono mt-2 p-2 bg-muted rounded">
+                      <p className="text-xs sm:text-sm font-mono p-2 bg-muted rounded break-all">
                         {getValueDisplay(setting.value)}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                       <Switch
                         checked={setting.is_public}
                         onCheckedChange={() => togglePublic(setting)}
                       />
-                      <Button size="sm" variant="outline" onClick={() => startEditing(setting)}>
-                        Modifier
+                      <Button size="icon" variant="outline" onClick={() => startEditing(setting)}>
+                        <Edit className="h-4 w-4" />
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => handleDelete(setting.id)}>
                         <Trash2 className="h-4 w-4 text-destructive" />
