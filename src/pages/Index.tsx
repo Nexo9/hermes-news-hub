@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText, Crown, Gamepad2, MessagesSquare, Globe, Heart } from "lucide-react";
+import { MobileNav } from "@/components/MobileNav";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -278,15 +279,18 @@ const Index = () => {
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-lg">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
+            {/* Mobile Menu */}
+            <MobileNav className="md:hidden" />
+            
             <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
-                  <Sparkles className="w-6 h-6 text-white" />
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-foreground tracking-tight">HERMÈS</h1>
-                  <p className="text-xs text-muted-foreground">Information Neutre & Sociale</p>
+                  <h1 className="text-lg sm:text-2xl font-bold text-foreground tracking-tight">HERMÈS</h1>
+                  <p className="text-xs text-muted-foreground hidden sm:block">Information Neutre & Sociale</p>
                 </div>
               </div>
               
@@ -350,7 +354,7 @@ const Index = () => {
             </div>
 
             {!user ? (
-              <Button onClick={handleAuth} className="bg-primary hover:bg-primary/90">
+              <Button onClick={handleAuth} className="bg-primary hover:bg-primary/90" size="sm">
                 Connexion
               </Button>
             ) : (

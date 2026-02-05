@@ -185,13 +185,13 @@ export function FeatureFlagsEditor() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Flag className="h-5 w-5" />
-              Feature Flags ({flags.length})
+              <span className="text-base sm:text-lg">Features ({flags.length})</span>
             </CardTitle>
-            <CardDescription>Activez ou désactivez des fonctionnalités pour différents groupes d'utilisateurs</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Activez ou désactivez des fonctionnalités</CardDescription>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -248,7 +248,7 @@ export function FeatureFlagsEditor() {
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="h-[300px] sm:h-[400px]">
           <div className="space-y-3">
             {flags.map((flag) => (
               <div
@@ -257,25 +257,25 @@ export function FeatureFlagsEditor() {
                   flag.is_enabled ? "bg-green-500/5 border-green-500/30" : "bg-muted/30"
                 }`}
               >
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-semibold font-mono">{flag.name}</p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                      <p className="font-semibold font-mono text-sm break-all">{flag.name}</p>
                       {getAppliesToBadge(flag.applies_to)}
-                      <Badge variant={flag.is_enabled ? "default" : "secondary"}>
+                      <Badge variant={flag.is_enabled ? "default" : "secondary"} className="text-[10px] sm:text-xs">
                         {flag.is_enabled ? "Activé" : "Désactivé"}
                       </Badge>
                     </div>
                     {flag.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{flag.description}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">{flag.description}</p>
                     )}
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0 flex-wrap justify-end">
                     <Select
                       value={flag.applies_to}
                       onValueChange={(v) => handleAppliesToChange(flag, v)}
                     >
-                      <SelectTrigger className="w-32">
+                      <SelectTrigger className="w-24 sm:w-32">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -289,8 +289,8 @@ export function FeatureFlagsEditor() {
                       checked={flag.is_enabled}
                       onCheckedChange={() => handleToggle(flag)}
                     />
-                    <Button size="icon" variant="ghost" onClick={() => handleDelete(flag.id)}>
-                      <Trash2 className="h-4 w-4 text-destructive" />
+                    <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => handleDelete(flag.id)}>
+                      <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-destructive" />
                     </Button>
                   </div>
                 </div>

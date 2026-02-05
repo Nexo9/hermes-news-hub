@@ -31,6 +31,15 @@ import { AdminUserManagement } from "@/components/AdminUserManagement";
 import { ThemeSelector } from "@/components/ThemeSelector";
 import { SystemMessagesPanel } from "@/components/SystemMessagesPanel";
 import { AdminConfigPanel } from "@/components/admin/AdminConfigPanel";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { Menu } from "lucide-react";
 
 interface Announcement {
   id: string;
@@ -69,6 +78,9 @@ export default function AdminDashboard() {
   const [userId, setUserId] = useState<string>("");
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [activeTab, setActiveTab] = useState("announcements");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isMobile = useIsMobile();
   const [stats, setStats] = useState<Stats>({
     totalUsers: 0,
     totalNews: 0,
@@ -299,24 +311,27 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Button onClick={() => navigate("/")} variant="ghost" size="icon">
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold flex items-center gap-2">
-                <Shield className="h-8 w-8 text-primary" />
+              <h1 className="text-xl sm:text-3xl font-bold flex items-center gap-2">
+                <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
                 Dashboard Administrateur
               </h1>
-              <p className="text-muted-foreground">Gérez votre plateforme HERMÈS</p>
+              <p className="text-sm text-muted-foreground hidden sm:block">Gérez votre plateforme HERMÈS</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <ThemeSelector isPremium={true} isAdmin={true} />
-            <Button onClick={fetchAllData} variant="outline" className="gap-2">
+            <Button onClick={fetchAllData} variant="outline" size="icon" className="sm:hidden">
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+            <Button onClick={fetchAllData} variant="outline" className="gap-2 hidden sm:flex">
               <RefreshCw className="h-4 w-4" />
               Actualiser
             </Button>
@@ -324,109 +339,158 @@ export default function AdminDashboard() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-4 mb-6 sm:mb-8">
           <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-blue-500" />
+            <CardContent className="p-3 sm:pt-4 sm:p-6">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
                 <div>
-                  <p className="text-2xl font-bold">{stats.totalUsers}</p>
-                  <p className="text-xs text-muted-foreground">Utilisateurs</p>
+                  <p className="text-lg sm:text-2xl font-bold">{stats.totalUsers}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Utilisateurs</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <TrendingUp className="h-5 w-5 text-green-500" />
+            <CardContent className="p-3 sm:pt-4 sm:p-6">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
                 <div>
-                  <p className="text-2xl font-bold">+{stats.newUsersToday}</p>
-                  <p className="text-xs text-muted-foreground">Aujourd'hui</p>
+                  <p className="text-lg sm:text-2xl font-bold">+{stats.newUsersToday}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Aujourd'hui</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <Newspaper className="h-5 w-5 text-purple-500" />
+            <CardContent className="p-3 sm:pt-4 sm:p-6">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Newspaper className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
                 <div>
-                  <p className="text-2xl font-bold">{stats.totalNews}</p>
-                  <p className="text-xs text-muted-foreground">Actualités</p>
+                  <p className="text-lg sm:text-2xl font-bold">{stats.totalNews}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Actualités</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <MessageSquare className="h-5 w-5 text-orange-500" />
+            <CardContent className="p-3 sm:pt-4 sm:p-6">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
                 <div>
-                  <p className="text-2xl font-bold">{stats.totalThreads}</p>
-                  <p className="text-xs text-muted-foreground">Threads</p>
+                  <p className="text-lg sm:text-2xl font-bold">{stats.totalThreads}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Threads</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <Heart className="h-5 w-5 text-red-500" />
+            <CardContent className="p-3 sm:pt-4 sm:p-6">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Heart className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
                 <div>
-                  <p className="text-2xl font-bold">{stats.totalLikes}</p>
-                  <p className="text-xs text-muted-foreground">Likes</p>
+                  <p className="text-lg sm:text-2xl font-bold">{stats.totalLikes}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Likes</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <Bookmark className="h-5 w-5 text-yellow-500" />
+            <CardContent className="p-3 sm:pt-4 sm:p-6">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Bookmark className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
                 <div>
-                  <p className="text-2xl font-bold">{stats.totalFavorites}</p>
-                  <p className="text-xs text-muted-foreground">Favoris</p>
+                  <p className="text-lg sm:text-2xl font-bold">{stats.totalFavorites}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Favoris</p>
                 </div>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-4">
-              <div className="flex items-center gap-2">
-                <Share2 className="h-5 w-5 text-cyan-500" />
+            <CardContent className="p-3 sm:pt-4 sm:p-6">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <Share2 className="h-4 w-4 sm:h-5 sm:w-5 text-cyan-500" />
                 <div>
-                  <p className="text-2xl font-bold">{stats.totalShares}</p>
-                  <p className="text-xs text-muted-foreground">Partages</p>
+                  <p className="text-lg sm:text-2xl font-bold">{stats.totalShares}</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Partages</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        <Tabs defaultValue="announcements" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="announcements" className="gap-2">
+        {/* Mobile Tab Selector */}
+        {isMobile ? (
+          <div className="mb-4">
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="w-full justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    {activeTab === "announcements" && <><Megaphone className="h-4 w-4" /> Annonces</>}
+                    {activeTab === "users" && <><Users className="h-4 w-4" /> Utilisateurs</>}
+                    {activeTab === "moderation" && <><MessageSquare className="h-4 w-4" /> Modération</>}
+                    {activeTab === "config" && <><Wrench className="h-4 w-4" /> Configuration</>}
+                    {activeTab === "antikia" && <><Bot className="h-4 w-4" /> Antik-IA</>}
+                    {activeTab === "settings" && <><Settings className="h-4 w-4" /> Paramètres</>}
+                  </span>
+                  <Menu className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="bottom" className="h-auto rounded-t-xl">
+                <SheetHeader className="pb-4">
+                  <SheetTitle>Sections Admin</SheetTitle>
+                </SheetHeader>
+                <div className="grid grid-cols-2 gap-2 pb-4">
+                  {[
+                    { value: "announcements", icon: Megaphone, label: "Annonces" },
+                    { value: "users", icon: Users, label: "Utilisateurs" },
+                    { value: "moderation", icon: MessageSquare, label: "Modération" },
+                    { value: "config", icon: Wrench, label: "Configuration" },
+                    { value: "antikia", icon: Bot, label: "Antik-IA" },
+                    { value: "settings", icon: Settings, label: "Paramètres" },
+                  ].map((tab) => (
+                    <Button
+                      key={tab.value}
+                      variant={activeTab === tab.value ? "default" : "outline"}
+                      className="justify-start gap-2 h-12"
+                      onClick={() => {
+                        setActiveTab(tab.value);
+                        setIsMobileMenuOpen(false);
+                      }}
+                    >
+                      <tab.icon className="h-4 w-4" />
+                      {tab.label}
+                    </Button>
+                  ))}
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+        ) : null}
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className={`w-full ${isMobile ? 'hidden' : 'grid grid-cols-6'}`}>
+            <TabsTrigger value="announcements" className="gap-1 sm:gap-2">
               <Megaphone className="h-4 w-4" />
               <span className="hidden sm:inline">Annonces</span>
             </TabsTrigger>
-            <TabsTrigger value="users" className="gap-2">
+            <TabsTrigger value="users" className="gap-1 sm:gap-2">
               <Users className="h-4 w-4" />
               <span className="hidden sm:inline">Utilisateurs</span>
             </TabsTrigger>
-            <TabsTrigger value="moderation" className="gap-2">
+            <TabsTrigger value="moderation" className="gap-1 sm:gap-2">
               <MessageSquare className="h-4 w-4" />
               <span className="hidden sm:inline">Modération</span>
             </TabsTrigger>
-            <TabsTrigger value="config" className="gap-2">
+            <TabsTrigger value="config" className="gap-1 sm:gap-2">
               <Wrench className="h-4 w-4" />
               <span className="hidden sm:inline">Configuration</span>
             </TabsTrigger>
-            <TabsTrigger value="antikia" className="gap-2">
+            <TabsTrigger value="antikia" className="gap-1 sm:gap-2">
               <Bot className="h-4 w-4" />
               <span className="hidden sm:inline">Antik-IA</span>
             </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2">
+            <TabsTrigger value="settings" className="gap-1 sm:gap-2">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">Paramètres</span>
             </TabsTrigger>
@@ -434,7 +498,7 @@ export default function AdminDashboard() {
 
           {/* Announcements Tab */}
           <TabsContent value="announcements">
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid gap-4 md:grid-cols-2 md:gap-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Créer une annonce</CardTitle>
@@ -515,12 +579,12 @@ export default function AdminDashboard() {
           <TabsContent value="moderation">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div>
                     <CardTitle>Modération des threads ({threads.length})</CardTitle>
                     <CardDescription>Supervisez et modérez les discussions</CardDescription>
                   </div>
-                  <div className="relative w-64">
+                  <div className="relative w-full sm:w-64">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                       placeholder="Rechercher..."
@@ -586,7 +650,7 @@ export default function AdminDashboard() {
 
           {/* Settings Tab */}
           <TabsContent value="settings">
-            <div className="grid md:grid-cols-2 gap-6">
+            <div className="grid gap-4 md:grid-cols-2 md:gap-6">
               <Card>
                 <CardHeader>
                   <CardTitle>Configuration de la plateforme</CardTitle>

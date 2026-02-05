@@ -222,13 +222,13 @@ export function ThemeConfigEditor() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Palette className="h-5 w-5" />
-              Thèmes ({themes.length})
+              <span className="text-base sm:text-lg">Thèmes ({themes.length})</span>
             </CardTitle>
-            <CardDescription>Gérez les thèmes visuels disponibles pour les utilisateurs</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Gérez les thèmes visuels</CardDescription>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -242,7 +242,7 @@ export function ThemeConfigEditor() {
                 <DialogTitle>Nouveau thème</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Nom unique</label>
                     <Input
@@ -276,7 +276,7 @@ export function ThemeConfigEditor() {
                     onChange={(e) => setNewTheme({ ...newTheme, description: e.target.value })}
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Primary (HSL)</label>
                     <Input
@@ -324,7 +324,7 @@ export function ThemeConfigEditor() {
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="h-[300px] sm:h-[400px]">
           <div className="space-y-3">
             {themes.map((theme) => (
               <div
@@ -335,7 +335,7 @@ export function ThemeConfigEditor() {
               >
                 {editingTheme?.id === theme.id ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Description</label>
                         <Input
@@ -360,11 +360,12 @@ export function ThemeConfigEditor() {
                         </Select>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                       {Object.entries(editingTheme.colors).map(([key, value]) => (
                         <div key={key} className="space-y-2">
-                          <label className="text-sm font-medium capitalize">{key} (HSL)</label>
+                          <label className="text-xs sm:text-sm font-medium capitalize">{key} (HSL)</label>
                           <Input
+                            className="text-sm"
                             value={value}
                             onChange={(e) => setEditingTheme({
                               ...editingTheme,
@@ -389,43 +390,44 @@ export function ThemeConfigEditor() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 sm:gap-4">
                       {renderColorPreview(theme.colors)}
                       <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-semibold">{theme.name}</p>
+                        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                          <p className="font-semibold text-sm sm:text-base">{theme.name}</p>
                           {theme.is_default && (
-                            <Badge className="gap-1">
+                            <Badge className="gap-1 text-[10px] sm:text-xs">
                               <Star className="h-3 w-3" />
-                              Par défaut
+                              <span className="hidden sm:inline">Par défaut</span>
+                              <span className="sm:hidden">Défaut</span>
                             </Badge>
                           )}
                           {getSubscriptionBadge(theme.subscription_required)}
                           {!theme.is_active && (
-                            <Badge variant="destructive">Inactif</Badge>
+                            <Badge variant="destructive" className="text-[10px] sm:text-xs">Inactif</Badge>
                           )}
                         </div>
                         {theme.description && (
-                          <p className="text-sm text-muted-foreground">{theme.description}</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground">{theme.description}</p>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                       <Switch
                         checked={theme.is_active}
                         onCheckedChange={() => toggleActive(theme)}
                       />
                       {!theme.is_default && (
-                        <Button size="sm" variant="outline" onClick={() => setAsDefault(theme)}>
-                          <Star className="h-4 w-4" />
+                        <Button size="icon" variant="outline" onClick={() => setAsDefault(theme)}>
+                          <Star className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
                       )}
-                      <Button size="sm" variant="outline" onClick={() => setEditingTheme(theme)}>
-                        <Edit className="h-4 w-4" />
+                      <Button size="icon" variant="outline" onClick={() => setEditingTheme(theme)}>
+                        <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => handleDelete(theme.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-destructive" />
                       </Button>
                     </div>
                   </div>

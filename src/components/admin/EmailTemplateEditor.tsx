@@ -177,13 +177,13 @@ export function EmailTemplateEditor() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
-              Templates d'emails ({templates.length})
+              <span className="text-base sm:text-lg">Emails ({templates.length})</span>
             </CardTitle>
-            <CardDescription>Personnalisez les emails envoyés aux utilisateurs</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Personnalisez les emails</CardDescription>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -192,12 +192,12 @@ export function EmailTemplateEditor() {
                 Ajouter
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Nouveau template</DialogTitle>
               </DialogHeader>
               <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Nom unique</label>
                     <Input
@@ -250,13 +250,13 @@ export function EmailTemplateEditor() {
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="h-[300px] sm:h-[400px]">
           <div className="space-y-3">
             {templates.map((template) => (
               <div key={template.id} className="border rounded-lg overflow-hidden">
                 {editingTemplate?.id === template.id ? (
-                  <div className="p-4 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 sm:p-4 space-y-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Sujet</label>
                         <Input
@@ -273,19 +273,19 @@ export function EmailTemplateEditor() {
                       </div>
                     </div>
                     <Tabs defaultValue="code">
-                      <TabsList>
-                        <TabsTrigger value="code" className="gap-1">
+                      <TabsList className="w-full grid grid-cols-2">
+                        <TabsTrigger value="code" className="gap-1 text-xs sm:text-sm">
                           <Code className="h-4 w-4" />
-                          Code HTML
+                          <span className="hidden sm:inline">Code </span>HTML
                         </TabsTrigger>
-                        <TabsTrigger value="preview" className="gap-1">
+                        <TabsTrigger value="preview" className="gap-1 text-xs sm:text-sm">
                           <Eye className="h-4 w-4" />
                           Aperçu
                         </TabsTrigger>
                       </TabsList>
                       <TabsContent value="code">
                         <textarea
-                          className="w-full h-64 p-3 rounded-md border bg-background font-mono text-sm"
+                          className="w-full h-48 sm:h-64 p-3 rounded-md border bg-background font-mono text-xs sm:text-sm"
                           value={editingTemplate.html_content}
                           onChange={(e) => setEditingTemplate({ ...editingTemplate, html_content: e.target.value })}
                         />
@@ -315,38 +315,38 @@ export function EmailTemplateEditor() {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <p className="font-semibold">{template.name}</p>
+                  <div className="p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                          <p className="font-semibold text-sm sm:text-base">{template.name}</p>
                           {template.variables.map((v) => (
-                            <Badge key={v} variant="outline" className="text-xs font-mono">
+                            <Badge key={v} variant="outline" className="text-[10px] sm:text-xs font-mono">
                               {`{{${v}}}`}
                             </Badge>
                           ))}
                           {!template.is_active && (
-                            <Badge variant="destructive" className="text-xs">Inactif</Badge>
+                            <Badge variant="destructive" className="text-[10px] sm:text-xs">Inactif</Badge>
                           )}
                         </div>
-                        <p className="text-sm text-primary mt-1">Sujet: {template.subject}</p>
+                        <p className="text-xs sm:text-sm text-primary">Sujet: {template.subject}</p>
                         {template.description && (
-                          <p className="text-sm text-muted-foreground mt-1">{template.description}</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground">{template.description}</p>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                         <Switch
                           checked={template.is_active}
                           onCheckedChange={() => toggleActive(template)}
                         />
-                        <Button size="sm" variant="outline" onClick={() => showPreview(template.html_content)}>
-                          <Eye className="h-4 w-4" />
+                        <Button size="icon" variant="outline" onClick={() => showPreview(template.html_content)}>
+                          <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingTemplate(template)}>
-                          <Edit className="h-4 w-4" />
+                        <Button size="icon" variant="outline" onClick={() => setEditingTemplate(template)}>
+                          <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
                         <Button size="icon" variant="ghost" onClick={() => handleDelete(template.id)}>
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-destructive" />
                         </Button>
                       </div>
                     </div>
@@ -359,7 +359,7 @@ export function EmailTemplateEditor() {
 
         {/* Preview Dialog */}
         <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-auto">
+          <DialogContent className="max-w-[95vw] sm:max-w-3xl max-h-[80vh] overflow-auto">
             <DialogHeader>
               <DialogTitle>Aperçu de l'email</DialogTitle>
             </DialogHeader>
