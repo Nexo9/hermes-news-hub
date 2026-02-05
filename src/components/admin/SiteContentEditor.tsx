@@ -164,13 +164,13 @@ export function SiteContentEditor() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Contenus du site ({contents.length})
+              <span className="text-base sm:text-lg">Contenus ({contents.length})</span>
             </CardTitle>
-            <CardDescription>Modifiez les textes et contenus affichés sur le site</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Modifiez les textes et contenus affichés</CardDescription>
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
@@ -255,8 +255,8 @@ export function SiteContentEditor() {
             </DialogContent>
           </Dialog>
         </div>
-        <div className="flex gap-2 mt-4">
-          <div className="relative flex-1">
+        <div className="flex flex-col sm:flex-row gap-2 mt-4">
+          <div className="relative flex-1 order-2 sm:order-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Rechercher..."
@@ -266,7 +266,7 @@ export function SiteContentEditor() {
             />
           </div>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-full sm:w-40 order-1 sm:order-2">
               <SelectValue placeholder="Catégorie" />
             </SelectTrigger>
             <SelectContent>
@@ -279,7 +279,7 @@ export function SiteContentEditor() {
         </div>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px]">
+        <ScrollArea className="h-[300px] sm:h-[400px]">
           <div className="space-y-3">
             {filteredContents.map((content) => (
               <div
@@ -288,7 +288,7 @@ export function SiteContentEditor() {
               >
                 {editingContent?.id === content.id ? (
                   <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <Input
                         value={editingContent.title}
                         onChange={(e) => setEditingContent({ ...editingContent, title: e.target.value })}
@@ -325,30 +325,30 @@ export function SiteContentEditor() {
                     </div>
                   </div>
                 ) : (
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-semibold">{content.title}</p>
-                        <Badge variant="outline" className="text-xs">{content.key}</Badge>
-                        <Badge className="text-xs">{content.category}</Badge>
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                        <p className="font-semibold text-sm sm:text-base">{content.title}</p>
+                        <Badge variant="outline" className="text-[10px] sm:text-xs">{content.key}</Badge>
+                        <Badge className="text-[10px] sm:text-xs">{content.category}</Badge>
                         {!content.is_active && (
-                          <Badge variant="destructive" className="text-xs">Inactif</Badge>
+                          <Badge variant="destructive" className="text-[10px] sm:text-xs">Inactif</Badge>
                         )}
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                      <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
                         {content.content}
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                       <Switch
                         checked={content.is_active}
                         onCheckedChange={() => toggleActive(content)}
                       />
                       <Button size="icon" variant="ghost" onClick={() => setEditingContent(content)}>
-                        <Edit className="h-4 w-4" />
+                        <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </Button>
                       <Button size="icon" variant="ghost" onClick={() => handleDelete(content.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
+                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-destructive" />
                       </Button>
                     </div>
                   </div>
