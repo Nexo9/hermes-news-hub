@@ -62,6 +62,7 @@ const INTEREST_TO_CATEGORY: Record<string, string[]> = {
 
 const Index = () => {
   const navigate = useNavigate();
+  const { showTutorial, currentStep, nextStep, prevStep, skipTutorial } = useTutorial();
   const [news, setNews] = useState<News[]>([]);
   const [filteredNews, setFilteredNews] = useState<News[]>([]);
   const [isLoading, setIsLoading] = useState(true);
