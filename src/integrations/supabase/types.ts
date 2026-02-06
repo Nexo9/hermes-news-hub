@@ -523,6 +523,8 @@ export type Database = {
           interests: string[] | null
           onboarding_completed: boolean | null
           status: string | null
+          tutorial_completed: boolean | null
+          tutorial_step: number | null
           updated_at: string
           username: string
           work_sector: string | null
@@ -537,6 +539,8 @@ export type Database = {
           interests?: string[] | null
           onboarding_completed?: boolean | null
           status?: string | null
+          tutorial_completed?: boolean | null
+          tutorial_step?: number | null
           updated_at?: string
           username: string
           work_sector?: string | null
@@ -551,6 +555,8 @@ export type Database = {
           interests?: string[] | null
           onboarding_completed?: boolean | null
           status?: string | null
+          tutorial_completed?: boolean | null
+          tutorial_step?: number | null
           updated_at?: string
           username?: string
           work_sector?: string | null
