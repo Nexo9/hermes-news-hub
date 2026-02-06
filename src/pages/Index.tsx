@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { AnimatePresence } from "framer-motion";
 import { supabase } from "@/integrations/supabase/client";
+import { useTutorial } from "@/hooks/useTutorial";
+import { TutorialOverlay } from "@/components/tutorial/TutorialOverlay";
+import { tutorialSteps } from "@/components/tutorial/tutorialSteps";
 import { useNavigate } from "react-router-dom";
 import { NewsCardEnhanced } from "@/components/NewsCardEnhanced";
 import { FilterBar } from "@/components/FilterBar";
