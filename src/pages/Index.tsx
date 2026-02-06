@@ -523,6 +523,18 @@ const Index = () => {
         isOpen={!!selectedNews}
         onClose={() => setSelectedNews(null)}
       />
+
+      {/* Interactive Tutorial */}
+      <AnimatePresence>
+        {showTutorial && (
+          <TutorialOverlay
+            currentStep={currentStep}
+            onNext={() => nextStep(tutorialSteps.length)}
+            onPrev={prevStep}
+            onSkip={skipTutorial}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
