@@ -2,50 +2,50 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @layer base {
   :root {
-    /* HERMÈS Identity Colors - Dark Mode Only */
-    --background: 260 100% 10%;     /* #1A0033 - Fond Principal */
-    --foreground: 0 0% 100%;        /* #FFFFFF - Texte Primaire */
+    /* HERMÈS Rebrand — Onyx & Gold */
+    --background: 220 15% 6%;          /* #0D0F12 - Deep onyx */
+    --foreground: 40 20% 95%;          /* #F5F0E8 - Warm ivory */
     
-    --card: 260 100% 12%;
-    --card-foreground: 0 0% 100%;
+    --card: 220 15% 9%;               /* #141619 */
+    --card-foreground: 40 20% 95%;
     
-    --popover: 260 100% 12%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 220 15% 9%;
+    --popover-foreground: 40 20% 95%;
     
-    --primary: 280 100% 50%;        /* #A800FF - Accentuation/Innovation */
-    --primary-foreground: 0 0% 100%;
+    --primary: 38 80% 55%;            /* #D4A030 - Antique gold */
+    --primary-foreground: 220 15% 6%;
     
-    --secondary: 260 100% 15%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 220 15% 13%;
+    --secondary-foreground: 40 20% 90%;
     
-    --muted: 260 50% 20%;
-    --muted-foreground: 0 0% 70%;
+    --muted: 220 10% 16%;
+    --muted-foreground: 220 10% 55%;
     
-    --accent: 280 100% 50%;         /* #A800FF - Accent */
-    --accent-foreground: 0 0% 100%;
+    --accent: 38 80% 55%;
+    --accent-foreground: 220 15% 6%;
     
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 40 20% 95%;
     
-    --border: 260 50% 25%;
-    --input: 260 50% 20%;
-    --ring: 280 100% 50%;
+    --border: 220 10% 18%;
+    --input: 220 10% 14%;
+    --ring: 38 80% 55%;
     
-    --radius: 0.75rem;
+    --radius: 0.5rem;
     
     /* Gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(280 100% 50%), hsl(260 100% 30%));
-    --gradient-hover: linear-gradient(135deg, hsl(280 100% 60%), hsl(260 100% 40%));
+    --gradient-primary: linear-gradient(135deg, hsl(38 80% 55%), hsl(28 70% 40%));
+    --gradient-hover: linear-gradient(135deg, hsl(38 80% 65%), hsl(28 70% 50%));
+    --gradient-subtle: linear-gradient(135deg, hsl(220 15% 9%), hsl(220 15% 12%));
     
     /* Shadows */
-    --shadow-glow: 0 0 30px hsl(280 100% 50% / 0.3);
-    --shadow-card: 0 4px 20px hsl(260 100% 5% / 0.6);
+    --shadow-glow: 0 0 40px hsl(38 80% 55% / 0.15);
+    --shadow-card: 0 2px 16px hsl(0 0% 0% / 0.4);
+    --shadow-elevated: 0 8px 32px hsl(0 0% 0% / 0.5);
     
     /* Transitions */
     --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -59,6 +59,11 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Playfair Display', Georgia, serif;
   }
 }
 
@@ -75,21 +80,18 @@ All colors MUST be HSL.
 }
 
 @keyframes pulse-slow {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 @keyframes shimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes gold-glow {
+  0%, 100% { box-shadow: 0 0 20px hsl(38 80% 55% / 0.1); }
+  50% { box-shadow: 0 0 30px hsl(38 80% 55% / 0.25); }
 }
 
 @layer utilities {
@@ -105,11 +107,38 @@ All colors MUST be HSL.
   .animate-shimmer {
     background: linear-gradient(
       90deg,
-      hsl(var(--primary) / 0.1) 0%,
-      hsl(var(--primary) / 0.3) 50%,
-      hsl(var(--primary) / 0.1) 100%
+      hsl(var(--primary) / 0.05) 0%,
+      hsl(var(--primary) / 0.15) 50%,
+      hsl(var(--primary) / 0.05) 100%
     );
     background-size: 200% 100%;
     animation: shimmer 2s infinite;
   }
+
+  .animate-gold-glow {
+    animation: gold-glow 3s ease-in-out infinite;
+  }
+
+  .font-display {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+
+  .font-body {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: hsl(220 15% 6%);
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(220 10% 22%);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(38 80% 55% / 0.5);
 }

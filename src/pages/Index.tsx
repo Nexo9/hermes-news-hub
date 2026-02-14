@@ -15,8 +15,9 @@ import { AdvancedSearchModal } from "@/components/AdvancedSearchModal";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
-import { Newspaper, Sparkles, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText, Crown, Gamepad2, MessagesSquare, Globe, Heart } from "lucide-react";
+import { Newspaper, LogOut, User as UserIcon, MessageCircle, Search as SearchIcon, Shield, Bookmark, Loader2, Map, FileText, Crown, Gamepad2, MessagesSquare, Globe, Heart } from "lucide-react";
 import { MobileNav } from "@/components/MobileNav";
+import { HermesLogo } from "@/components/HermesLogo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -290,13 +291,8 @@ const Index = () => {
             
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-primary flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-lg sm:text-2xl font-bold text-foreground tracking-tight">HERMÈS</h1>
-                  <p className="text-xs text-muted-foreground hidden sm:block">Information Neutre & Sociale</p>
-                </div>
+                <HermesLogo size="sm" className="sm:hidden" />
+                <HermesLogo size="md" showText className="hidden sm:flex" />
               </div>
               
               {/* Navigation Links */}
