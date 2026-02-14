@@ -21,10 +21,10 @@ const themes: Theme[] = [
   {
     id: "default",
     name: "HERMÈS Classic",
-    description: "Le thème violet iconique d'HERMÈS",
-    primary: "280 100% 50%",
-    background: "260 100% 10%",
-    accent: "280 100% 50%",
+    description: "Or antique sur onyx — l'élégance Hermès",
+    primary: "38 80% 55%",
+    background: "220 15% 6%",
+    accent: "38 80% 55%",
     premium: false,
   },
   {

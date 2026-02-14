@@ -16,8 +16,8 @@
    Crown,
    Gamepad2,
    Heart,
-   Sparkles,
  } from "lucide-react";
+ import { HermesLogo } from "@/components/HermesLogo";
  
  interface MobileNavProps {
    className?: string;
@@ -50,14 +50,11 @@
          </Button>
        </SheetTrigger>
        <SheetContent side="left" className="w-72 p-0">
-         <SheetHeader className="p-4 border-b">
-           <SheetTitle className="flex items-center gap-2">
-             <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-               <Sparkles className="w-5 h-5 text-white" />
-             </div>
-             <span className="text-xl font-bold">HERMÈS</span>
-           </SheetTitle>
-         </SheetHeader>
+          <SheetHeader className="p-4 border-b">
+            <SheetTitle className="flex items-center gap-2">
+              <HermesLogo size="sm" showText />
+            </SheetTitle>
+          </SheetHeader>
          <nav className="flex flex-col p-2">
            {navItems.map((item) => (
              <Button
