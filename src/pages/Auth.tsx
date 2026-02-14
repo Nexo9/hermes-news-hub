@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Sparkles, Mail, Lock, Crown, ArrowLeft } from "lucide-react";
+import { Mail, Lock, Crown, ArrowLeft } from "lucide-react";
 import OnboardingForm from "@/components/auth/OnboardingForm";
+import { HermesLogo } from "@/components/HermesLogo";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
@@ -198,10 +199,7 @@ const Auth = () => {
               <ArrowLeft className="w-4 h-4" />
             </Button>
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-gradient-primary flex items-center justify-center">
-                <Sparkles className="w-4 h-4 text-white" />
-              </div>
-              <span className="font-bold text-foreground">HERMÈS</span>
+              <HermesLogo size="sm" showText />
             </div>
           </div>
 
@@ -219,10 +217,8 @@ const Auth = () => {
       <Card className="w-full max-w-md p-8 bg-card border-border shadow-glow">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-xl bg-gradient-primary flex items-center justify-center mb-4">
-            <Sparkles className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-foreground">HERMÈS</h1>
+          <HermesLogo size="lg" className="mb-4" />
+          <h1 className="text-3xl font-display font-bold text-foreground">Hermès</h1>
           <p className="text-sm text-muted-foreground">Information Neutre & Sociale</p>
         </div>
 
